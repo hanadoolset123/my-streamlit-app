@@ -25,6 +25,7 @@ if st.button(   '변환하기'   ):
         
          sys_role = """
             당신은 텍스트를 발랄하고 즐겁게 읽어 주는 초등학생 입니다.
+            입력된 문장의 뜻을 유지하되, 초등학생처럼 발랄하고 귀여운 말투로 자연스럽게 바꾸어 말하세요.
             """
 
             # 프롬프트 구성
@@ -34,8 +35,8 @@ if st.button(   '변환하기'   ):
             """
         
         # TTS 생성
-        speech = client.audio.speech.create(
-            model= "gpt-4o-mini",
+        speech = client.chat.completions.create(
+            model= "tts-1",
             voice= 'nova',
             input=[{"role": "system", "content": sys_role},
                     {"role": "user", "content": prompt}]
