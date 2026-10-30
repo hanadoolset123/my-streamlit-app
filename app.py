@@ -9,7 +9,7 @@ client =
 
 # 페이지 설정
 st.set_page_config(  page_title="텍스트 음성 변환기", page_icon="🤖"   )
-st.title(  '텍스트를 음성으로 변환 하겠습니'   )
+st.title(  '텍스트를 음성으로 변환 하겠습니다'   )
 
 # 텍스트 입력
 text = st.text_area(
@@ -36,12 +36,12 @@ if st.button(   '변환하기'   ):
         
         # TTS 생성
         speech = client.chat.completions.create(
-            model= "tts-1",
+            model= ""gpt-4o-mini"",
             voice= 'nova',
             input=[{"role": "system", "content": sys_role},
                     {"role": "user", "content": prompt}]
         )
-        audio_bytes =
+        audio_bytes =speech.content
 
         # 음성 출력
         st.markdown("### 🔊 음성 재생")
