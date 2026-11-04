@@ -674,7 +674,7 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 if selected_page == PAGES[0]:
-    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 홈/AI 비서 통합 · 음성파일 영역 제거")
+    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 한 줄 입력창 통합")
     st.markdown("""<div class="able-home">
       <div class="able-orb">✦</div>
       <h1>무엇을 도와드릴까요?</h1>
@@ -683,70 +683,46 @@ if selected_page == PAGES[0]:
     for message in st.session_state.messages[-10:]:
         with st.chat_message(message["role"]):
             st.write(message["content"])
-    # 홈에서도 회의록을 첨부할 수 있도록 추가
-    home_file = st.file_uploader(
-        "📎 회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
-        on_change=queue_meeting_upload,
-        args=("able_home_upload",),
-        help="파일만 첨부됩니다. 텍스트나 음성으로 분석을 지시해야 실행됩니다."
+    # 한 줄 입력바: [+ 첨부/설정] [질문 입력] [달력] [마이크] [전송]
+    st.markdown("""<style>
+    /* 홈 입력바를 한 줄로 정렬하고 여백을 최소화 */
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
+        align-items:center; gap:.35rem;
+        border:1px solid #e1e5ec; border-radius:32px;
+        padding:.32rem .55rem; background:white;
+        box-shadow:0 2px 10px rgba(20,35,60,.035);
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
+        border:none; box-shadow:none; background:transparent;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
+        border:0; box-shadow:none; background:transparent; padding:.25rem;
+    }
+    .able-input-anchor {display:none}
+    </style>""", unsafe_allow_html=True)
+    plus_col, input_col, cal_col, mic_col, send_col = st.columns(
+        [0.75, 7.1, 0.75, 0.75, 0.75], vertical_alignment="center", gap="small"
     )
-    if home_file is not None:
-        st.caption(f"첨부 완료: {home_file.name}")
-        st.caption("파일만 준비했어요. 아래 메시지창에 '회의록 전체 분석해줘'라고 입력하거나 마이크로 말해보세요.")
-    elif st.session_state.document:
-        st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
-
-    # 기존 AI 비서 화면의 음성 답변(TTS)을 홈으로 통합
-    home_tts_enabled = st.toggle("🔊 AI 답변 음성 재생", value=False, key="home_tts_enabled")
-    if st.session_state.get("last_answer") and home_tts_enabled:
-        last_answer = st.session_state.last_answer
-        if st.session_state.get("home_tts_answer") != last_answer:
-            try:
-                with st.spinner("음성 답변을 준비하고 있어요..."):
-                    st.session_state.last_audio = make_speech(last_answer)
-                    st.session_state.home_tts_answer = last_answer
-            except Exception as exc:
-                st.warning(f"음성 답변 생성 실패: {exc}")
-        if st.session_state.get("last_audio"):
-            st.audio(st.session_state.last_audio, format="audio/mp3")
-
-    # 마이크는 녹음 후 '음성 질문 보내기'를 눌렀을 때만 실행됩니다.
-    # 달력은 날짜 입력칸 대신 월간 달력을 팝오버에 바로 표시합니다.
-    mic_col, cal_col, _ = st.columns([1, 1, 8], vertical_alignment="center")
-    with mic_col:
-        with st.popover("🎙️", help="마이크로 음성 질문하기"):
-            st.markdown("**음성으로 에이블에게 질문하기**")
-            st.caption("마이크를 눌러 녹음하고, 녹음을 마친 다음 전송 버튼을 누르세요.")
-            home_recording = st.audio_input("마이크 녹음", key="home_voice_recording")
-            if home_recording is None:
-                st.info("위 마이크를 눌러 녹음을 시작하고 종료하면 전송할 수 있어요.")
-            else:
-                st.success("녹음 완료! 아래 버튼으로 음성 질문을 전송하세요.")
-            if st.button("🎙️ 음성 질문 보내기", key="home_voice_send", type="primary", use_container_width=True):
-                if home_recording is None:
-                    st.warning("먼저 마이크 버튼을 눌러 음성을 녹음하고 종료해주세요.")
-                else:
-                    try:
-                        raw_audio = home_recording.getvalue()
-                        if not raw_audio:
-                            st.warning("녹음된 음성이 없어요. 다시 녹음해주세요.")
-                        else:
-                            with st.spinner("음성을 텍스트로 변환하고 있어요..."):
-                                transcription = client.audio.transcriptions.create(
-                                    model="whisper-1",
-                                    file=("home_recording.wav", raw_audio, "audio/wav"),
-                                    language="ko",
-                                )
-                                spoken_question = transcription.text.strip()
-                            if not spoken_question:
-                                st.warning("음성을 인식하지 못했어요. 다시 녹음해주세요.")
-                            else:
-                                st.session_state.last_transcript = spoken_question
-                                st.info(f"인식된 질문: {spoken_question}")
-                                handle_home_request(spoken_question, user_name)
-                                st.rerun()
-                    except Exception as exc:
-                        st.error(f"음성 질문 처리 오류: {exc}")
+    with plus_col:
+        st.markdown('<span class="able-input-anchor"></span>', unsafe_allow_html=True)
+        with st.popover("＋", help="회의록 첨부 및 음성 설정"):
+            st.markdown("**첨부 및 설정**")
+            home_file = st.file_uploader(
+                "회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
+                on_change=queue_meeting_upload, args=("able_home_upload",),
+                help="첨부만으로 분석하지 않습니다. 메시지로 분석을 요청해야 합니다."
+            )
+            st.toggle("🔊 AI 답변 음성 재생", value=False, key="home_tts_enabled")
+            if home_file is not None:
+                st.success(f"첨부 완료: {home_file.name}")
+            elif st.session_state.document:
+                st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
+    with input_col:
+        question = st.text_input(
+            "에이블에게 메시지", key="able_inline_question",
+            placeholder="에이블에게 무엇이든 물어보세요...",
+            label_visibility="collapsed"
+        )
     with cal_col:
         with st.popover("📅", help="월간 미니 달력 열기"):
             if "home_calendar_cursor" not in st.session_state:
@@ -783,13 +759,56 @@ if selected_page == PAGES[0]:
             st.button("전체 일정 관리 열기", key="home_open_calendar",
                       on_click=navigate_to, args=(PAGES[3],))
 
-    question = st.chat_input("에이블에게 메시지를 보내세요...")
-    if question:
-        try:
-            handle_home_request(question, user_name)
-            st.rerun()
-        except Exception as exc:
-            st.error(f"AI 요청 오류: {exc}")
+    with mic_col:
+        with st.popover("🎙️", help="마이크로 음성 질문하기"):
+            st.markdown("**음성으로 에이블에게 질문하기**")
+            home_recording = st.audio_input("마이크 녹음", key="home_voice_recording")
+            if st.button("음성 질문 보내기", key="home_voice_send", type="primary", use_container_width=True):
+                if home_recording is None:
+                    st.warning("먼저 음성을 녹음해주세요.")
+                else:
+                    try:
+                        with st.spinner("음성을 인식하고 있어요..."):
+                            transcription = client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=("home_recording.wav", home_recording.getvalue(), "audio/wav"),
+                                language="ko",
+                            )
+                        spoken_question = transcription.text.strip()
+                        if spoken_question:
+                            st.session_state.last_transcript = spoken_question
+                            handle_home_request(spoken_question, user_name)
+                            st.rerun()
+                        else:
+                            st.warning("음성을 인식하지 못했습니다.")
+                    except Exception as exc:
+                        st.error(f"음성 질문 처리 오류: {exc}")
+    with send_col:
+        send_question = st.button("➤", key="able_inline_send", help="질문 전송", use_container_width=True)
+
+    if send_question:
+        if question.strip():
+            try:
+                handle_home_request(question.strip(), user_name)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"AI 요청 오류: {exc}")
+        else:
+            st.warning("질문을 입력해주세요.")
+
+    # 음성 답변 기능은 + 메뉴에서 활성화
+    if st.session_state.get("last_answer") and st.session_state.get("home_tts_enabled", False):
+        last_answer = st.session_state.last_answer
+        if st.session_state.get("home_tts_answer") != last_answer:
+            try:
+                with st.spinner("음성 답변을 준비하고 있어요..."):
+                    st.session_state.last_audio = make_speech(last_answer)
+                    st.session_state.home_tts_answer = last_answer
+            except Exception as exc:
+                st.warning(f"음성 답변 생성 실패: {exc}")
+        if st.session_state.get("last_audio"):
+            st.audio(st.session_state.last_audio, format="audio/mp3")
+
     st.caption("왼쪽 위 메뉴(☰)를 열면 회의록 원클릭·일정·이메일 기능을 사용할 수 있어요.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
@@ -1317,3 +1336,4 @@ if selected_page == PAGES[5]:
             st.error(f"일정 조회 실패: {exc}")
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
+        st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
