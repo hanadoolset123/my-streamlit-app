@@ -18,7 +18,7 @@ import pandas as pd
 import streamlit as st
 from openai import OpenAI
 
-st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""<style>
 .block-container{max-width:1250px;padding-top:1.6rem;padding-bottom:3rem}
 .hero{background:linear-gradient(125deg,#17334f,#245e76);border-radius:20px;padding:25px 29px;color:white;margin-bottom:20px}
@@ -73,7 +73,7 @@ if not st.session_state.get("authenticated", False):
             st.error("비밀번호가 올바르지 않습니다.")
     st.stop()
 
-st.markdown('<div class="hero"><h1>🤖 에이블 · AI 업무비서</h1><p>김 대리의 회의 분석부터 업무 실행까지 · 음성 · 우선순위 · 일정 · 이메일</p></div>',unsafe_allow_html=True)
+
 
 if not (os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", None)):
     st.error("OPENAI_API_KEY를 Streamlit Secrets 또는 환경 변수에 등록하세요.")
@@ -237,7 +237,7 @@ def ask_ai(question, document=""):
             st.session_state.mail_to = args.get("to", "")
             st.session_state.mail_subject = args.get("subject", "에이블 AI 비서 업무 요약")
             st.session_state.mail_body = args.get("body", "")
-            answer = "이메일 발송 요청을 확인했습니다. '이메일' 탭에서 수신자와 본문을 검토한 후 발송을 승인해주세요."
+            answer = "이메일 발송 요청을 확인했습니다. '이메일' 메뉴에서 수신자와 본문을 검토한 후 발송을 승인해주세요."
         except (ValueError, KeyError, TypeError):
             answer = "메일 초안을 읽는 데 실패했습니다. 이메일 탭에서 직접 작성해주세요."
     else:
@@ -553,20 +553,62 @@ def send_email(to, subject, body):
 
 
 
-tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(["✨ 회의록 원클릭", "🎙 AI 비서", "🎯 업무 우선순위", "📅 일정 관리", "✉️ 이메일", "🔗 Google Calendar"])
+# 숨김 사이드바 메뉴 + 미니멀 홈 화면
+PAGES = ["🏠 홈", "✨ 회의록 원클릭", "🎙 AI 비서", "🎯 업무 우선순위", "📅 일정 관리", "✉️ 이메일", "🔗 Google Calendar"]
+if "able_page" not in st.session_state:
+    st.session_state.able_page = PAGES[0]
 
 with st.sidebar:
-    st.header("⚙️ 개인 설정")
+    st.markdown("### ✦ ABLE")
+    st.caption("AI 업무비서")
+    selected_page = st.radio(
+        "메뉴", PAGES,
+        index=PAGES.index(st.session_state.able_page),
+        key="able_navigation",
+        label_visibility="collapsed"
+    )
+    st.session_state.able_page = selected_page
+    st.divider()
+    st.markdown("**개인 설정**")
     user_name = st.text_input("사용자 이름", value="김 대리")
-    st.caption("업로드 자료는 현재 세션에서 활용됩니다. 실무 개인정보나 회사 기밀 자료는 업로드하지 마세요.")
-    if st.button("대화 기록 초기화",use_container_width=True):
-        st.session_state.messages=[]
-        st.session_state.last_answer=""
-        st.session_state.last_audio=None
+    if st.button("대화 기록 초기화", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.last_answer = ""
+        st.session_state.last_audio = None
         st.rerun()
+    st.caption("업무 자료에 민감한 정보가 포함되지 않도록 확인하세요.")
+
+st.markdown("""<style>
+.block-container{max-width:1050px;padding-top:1.1rem}
+.able-home{min-height:290px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 12px 14px}
+.able-orb{height:84px;width:84px;border-radius:26px;background:#eef4fb;display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:22px}
+.able-home h1{font-size:2.2rem;letter-spacing:-.06em;margin:0 0 10px;font-weight:750}
+.able-home p{color:#788596;font-size:1rem;margin:0}
+[data-testid="stSidebar"]{border-right:1px solid #e8edf2}
+[data-testid="stChatInput"]{max-width:790px;margin:auto}
+</style>""", unsafe_allow_html=True)
+
+if selected_page == PAGES[0]:
+    st.markdown("""<div class="able-home">
+      <div class="able-orb">✦</div>
+      <h1>무엇을 도와드릴까요?</h1>
+      <p>당신의 AI 개인비서, ABLE</p>
+    </div>""", unsafe_allow_html=True)
+    for message in st.session_state.messages[-10:]:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+    question = st.chat_input("에이블에게 메시지를 보내세요...")
+    if question:
+        try:
+            with st.spinner("에이블이 답변을 준비하고 있어요..."):
+                ask_ai(f"[현재 사용자: {user_name}]\n{question}", st.session_state.document)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"AI 응답 오류: {exc}")
+    st.caption("왼쪽 위 메뉴(☰)를 열면 회의록 원클릭·일정·이메일 기능을 사용할 수 있어요.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
-with tab0:
+if selected_page == PAGES[1]:
     st.subheader("✨ 회의록 원클릭 분석")
     st.caption("한 번에 요약·업무 추출·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
     one_file = st.file_uploader("회의록 TXT 파일", type=["txt"], key="oneclick_txt")
@@ -619,7 +661,7 @@ with tab0:
             for rank, task in enumerate(ranked[:3], 1):
                 q, score, _ = priority_score(task)
                 st.write(f"**{rank}. {task.get('task', '')}** · 담당 {task.get('owner') or '확인 필요'} · 마감 {task.get('due') or '미확인'} · {q} ({score:.1f}점)")
-            st.caption("전체 업무와 아이젠하워 4분면은 '업무 우선순위' 탭에서 확인·수정할 수 있습니다.")
+            st.caption("전체 업무와 아이젠하워 4분면은 '업무 우선순위' 메뉴에서 확인·수정할 수 있습니다.")
         else:
             st.info("추출된 업무가 없습니다.")
 
@@ -705,7 +747,7 @@ with tab0:
                 except Exception as exc:
                     st.error(f"이메일 발송 실패: {exc}")
 
-with tab1:
+if selected_page == PAGES[2]:
     st.subheader("음성 명령과 회의록 분석")
     st.caption("TXT 회의록 + 음성 입력 또는 텍스트 질문 · 음성 인식 결과 확인")
     uploaded=st.file_uploader("회의록 TXT 업로드",type=["txt"],key="meeting_txt")
@@ -764,7 +806,7 @@ with tab1:
 
 
 
-with tab2:
+if selected_page == PAGES[3]:
     st.subheader("업무 우선순위 분석")
     st.caption("회의록에서 할 일을 추출하고 중요도를 직접 조정하세요. 마감일이 없는 업무는 긴급하다고 추정하지 않습니다.")
     meeting_date=st.date_input("회의 기준일",value=date.today(),key="task_meeting_date")
@@ -847,7 +889,7 @@ with tab2:
         st.info("회의록 업로드 후 '업무 자동 추출'을 실행하면 업무 카드와 4분면이 나타납니다.")
 
 
-with tab3:
+if selected_page == PAGES[4]:
     st.subheader("📅 확정 일정 캘린더")
     st.caption("회의록 일정 승인 + 업무 마감일 반영 + 충돌 탐지 / Google Calendar 별도 탭에서 동기화 가능")
 
@@ -1030,7 +1072,7 @@ with tab3:
             st.error(f"CSV 가져오기 실패: {exc}")
 
 
-with tab4:
+if selected_page == PAGES[5]:
     st.subheader("✉️ 이메일 발송")
     st.caption("LLM이 요청 시 초안을 생성하고, 실제 발송은 사용자가 승인한 후에만 실행합니다.")
 
@@ -1083,7 +1125,7 @@ with tab4:
 # ==========================================
 # Google Calendar integration tab
 # ==========================================
-with tab5:
+if selected_page == PAGES[6]:
     st.subheader("🔗 Google Calendar 연결 및 동기화")
     st.caption("내부 캘린더의 확정 일정을 선택해서 구글 캘린더에 등록합니다. 자동 업로드하지 않습니다.")
     try:
