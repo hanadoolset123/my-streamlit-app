@@ -54,7 +54,18 @@ GOOGLE_SCOPES = [
 ]
 
 def config(name, default=""):
-    return os.getenv(name) or st.secrets.get(name, default)
+    """환경변수를 우선 사용하고, Streamlit Secrets 파일이 없어도 예외를 내지 않습니다."""
+    env = os.getenv(name)
+    if env:
+        return env
+    try:
+        return st.secrets.get(name, default)
+    except (FileNotFoundError, KeyError):
+        return default
+    except Exception as exc:
+        if type(exc).__name__ == "StreamlitSecretNotFoundError":
+            return default
+        raise
 
 app_password = config("ABLE_APP_PASSWORD")
 if not app_password:
@@ -75,10 +86,11 @@ if not st.session_state.get("authenticated", False):
 
 
 
-if not (os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", None)):
-    st.error("OPENAI_API_KEY를 Streamlit Secrets 또는 환경 변수에 등록하세요.")
+openai_api_key = config("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("OPENAI_API_KEY를 Streamlit Cloud의 Secrets에 설정해주세요.")
     st.stop()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"])
+client = OpenAI(api_key=openai_api_key)
 
 
 
@@ -512,8 +524,8 @@ def render_month_calendar(events, month_start):
 
 def send_email(to, subject, body):
     """Gmail 465 SSL / 587 STARTTLS 순서대로 접속. 인증 실패는 재시도하지 않음."""
-    address = str(st.secrets.get("GMAIL_ADDRESS", os.getenv("GMAIL_ADDRESS", ""))).strip()
-    password = str(st.secrets.get("GMAIL_APP_PASSWORD", os.getenv("GMAIL_APP_PASSWORD", ""))).replace(" ", "").strip()
+    address = str(config("GMAIL_ADDRESS")).strip()
+    password = str(config("GMAIL_APP_PASSWORD")).replace(" ", "").strip()
     if not address or not password:
         raise RuntimeError("GMAIL_ADDRESS 또는 GMAIL_APP_PASSWORD가 설정되지 않았습니다.")
     msg = EmailMessage()
@@ -553,9 +565,8 @@ def send_email(to, subject, body):
 
 
 
-# 홈/원클릭 파일 업로드 즉시 자동 분석 예약 및 메뉴 이동
-# Streamlit 위젯의 on_change/on_click 콜백은 재실행 전에 호출되므로
-# 이미 만들어진 라디오 위젯의 상태를 사후 변경하는 오류를 피합니다.
+# 파일 첨부만으로 분석을 시작하지 않습니다.
+# 사용자의 텍스트/음성 지시 또는 원클릭 화면의 분석 버튼으로만 분석합니다.
 def navigate_to(page):
     st.session_state.able_navigation = page
 
@@ -566,21 +577,46 @@ def queue_meeting_upload(widget_key, destination=None):
         return
     content = extract_txt(uploaded)
     if not content.strip():
-        st.session_state.upload_warning = '파일 내용이 비어 있습니다.'
+        st.session_state.upload_warning = "파일 내용이 비어 있습니다."
         return
-    digest = hashlib.sha256(content.encode('utf-8')).hexdigest()
-    if digest != st.session_state.get('analyzed_document_hash'):
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    if digest != st.session_state.get("analysis_document_hash"):
         st.session_state.document = content
         st.session_state.doc_name = uploaded.name
         st.session_state.tasks = []
         st.session_state.pending_events = []
-        st.session_state.oneclick_summary = ''
-        st.session_state.mail_body = ''
-        st.session_state.analysis_queued = True
+        st.session_state.oneclick_summary = ""
+        st.session_state.mail_body = ""
         st.session_state.analysis_document_hash = digest
-        st.session_state.upload_warning = ''
-    if destination is not None:
-        st.session_state.able_navigation = destination
+        st.session_state.analysis_queued = False
+        st.session_state.upload_warning = ""
+    # 업로드 시 화면을 강제로 이동하지 않습니다.
+
+
+def handle_home_request(question, user_name):
+    question = question.strip()
+    if not question:
+        return
+    document = st.session_state.document
+    # 전체 분석은 명시적인 지시가 있을 때만 수행
+    full_analysis = any(word in question.replace(" ", "") for word in (
+        "전체분석", "자동분석", "원클릭분석", "모두분석", "한번에분석",
+        "업무와일정", "요약하고업무", "요약하고일정",
+    ))
+    if full_analysis:
+        if not document.strip():
+            st.warning("먼저 회의록 TXT 파일을 첨부해주세요.")
+            return
+        with st.spinner("회의록 요약·업무·중요도·일정·이메일 초안을 분석하고 있어요..."):
+            analyze_meeting_automatically(date.today())
+        st.session_state.messages = (st.session_state.messages + [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": "회의록 전체 분석이 끝났습니다. 회의록 원클릭 메뉴에서 요약, 업무 TOP 3, 일정 후보와 이메일 초안을 확인하세요. 실제 등록·발송은 승인 후 진행합니다."},
+        ])[-10:]
+        st.session_state.able_navigation = PAGES[1]
+    else:
+        with st.spinner("에이블이 답변을 준비하고 있어요..."):
+            ask_ai(f"[현재 사용자: {user_name}]\n{question}", document)
 
 
 def analyze_meeting_automatically(meeting_day):
@@ -633,9 +669,12 @@ st.markdown("""<style>
 .able-home p{color:#788596;font-size:1rem;margin:0}
 [data-testid="stSidebar"]{border-right:1px solid #e8edf2}
 [data-testid="stChatInput"]{max-width:790px;margin:auto}
+/* 월간 미니 달력이 7열로 보이도록 팝오버 넓이 확보 */
+[data-testid="stPopoverBody"]:has(.cal-grid){min-width:min(560px,90vw)}
 </style>""", unsafe_allow_html=True)
 
 if selected_page == PAGES[0]:
+    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 음성/월간달력 수정본")
     st.markdown("""<div class="able-home">
       <div class="able-orb">✦</div>
       <h1>무엇을 도와드릴까요?</h1>
@@ -648,85 +687,101 @@ if selected_page == PAGES[0]:
     home_file = st.file_uploader(
         "📎 회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
         on_change=queue_meeting_upload,
-        args=("able_home_upload", PAGES[1]),
-        help="파일을 첨부하면 요약·업무·중요도·일정·메일 초안이 자동 분석됩니다."
+        args=("able_home_upload",),
+        help="파일만 첨부됩니다. 텍스트나 음성으로 분석을 지시해야 실행됩니다."
     )
     if home_file is not None:
         st.caption(f"첨부 완료: {home_file.name}")
-        st.button("✨ 분석 결과 보기", key="home_result_open", type="primary",
-                  on_click=navigate_to, args=(PAGES[1],), use_container_width=True)
+        st.caption("파일만 준비했어요. 아래 메시지창에 '회의록 전체 분석해줘'라고 입력하거나 마이크로 말해보세요.")
     elif st.session_state.document:
         st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
 
-    # 홈 메시지창 바로 위에 음성 녹음 및 미니 달력 버튼 배치
-    st.markdown("""<style>
-    div[data-testid="stPopover"] button {border-radius:999px;}
-    </style>""", unsafe_allow_html=True)
-    mic_col, cal_col, hint_col = st.columns([1, 1, 8], vertical_alignment="center")
+    # 마이크는 녹음 후 '음성 질문 보내기'를 눌렀을 때만 실행됩니다.
+    # 달력은 날짜 입력칸 대신 월간 달력을 팝오버에 바로 표시합니다.
+    mic_col, cal_col, _ = st.columns([1, 1, 8], vertical_alignment="center")
     with mic_col:
         with st.popover("🎙️", help="마이크로 음성 질문하기"):
             st.markdown("**음성으로 에이블에게 질문하기**")
+            st.caption("마이크를 눌러 녹음하고, 녹음을 마친 다음 전송 버튼을 누르세요.")
             home_recording = st.audio_input("마이크 녹음", key="home_voice_recording")
-            if st.button("음성 질문 보내기", key="home_voice_send", type="primary",
-                         disabled=home_recording is None):
-                try:
-                    with st.spinner("음성을 텍스트로 변환하는 중..."):
-                        transcription = client.audio.transcriptions.create(
-                            model="whisper-1",
-                            file=("home_recording.wav", home_recording.getvalue()),
-                            language="ko"
-                        )
-                        spoken_question = transcription.text.strip()
-                        st.session_state.last_transcript = spoken_question
-                    if spoken_question:
-                        with st.spinner("에이블이 답변하는 중..."):
-                            ask_ai(f"[현재 사용자: {user_name}]\\n{spoken_question}",
-                                   st.session_state.document)
-                        st.rerun()
-                    else:
-                        st.warning("음성을 인식하지 못했어요. 다시 녹음해주세요.")
-                except Exception as exc:
-                    st.error(f"음성 질문 오류: {exc}")
-    with cal_col:
-        with st.popover("📅", help="미니 달력 열기"):
-            st.markdown("**미니 캘린더**")
-            selected_home_date = st.date_input(
-                "날짜 선택", value=date.today(), key="home_mini_date"
-            )
-            matching_events = []
-            for home_event in st.session_state.events:
-                try:
-                    normalized = normalize_event(home_event)
-                    if normalized["date"] == selected_home_date.isoformat():
-                        matching_events.append(normalized)
-                except (ValueError, TypeError, KeyError):
-                    continue
-            if matching_events:
-                st.caption(f"{selected_home_date:%Y-%m-%d} · {len(matching_events)}개 일정")
-                for home_event in matching_events:
-                    st.write("• " + home_event["title"])
+            if home_recording is None:
+                st.info("위 마이크를 눌러 녹음을 시작하고 종료하면 전송할 수 있어요.")
             else:
-                st.caption("선택한 날짜에 등록된 내부 일정이 없어요.")
-            st.caption("이 미니 달력에는 에이블 내부 일정이 표시됩니다.")
+                st.success("녹음 완료! 아래 버튼으로 음성 질문을 전송하세요.")
+            if st.button("🎙️ 음성 질문 보내기", key="home_voice_send", type="primary", use_container_width=True):
+                if home_recording is None:
+                    st.warning("먼저 마이크 버튼을 눌러 음성을 녹음하고 종료해주세요.")
+                else:
+                    try:
+                        raw_audio = home_recording.getvalue()
+                        if not raw_audio:
+                            st.warning("녹음된 음성이 없어요. 다시 녹음해주세요.")
+                        else:
+                            with st.spinner("음성을 텍스트로 변환하고 있어요..."):
+                                transcription = client.audio.transcriptions.create(
+                                    model="whisper-1",
+                                    file=("home_recording.wav", raw_audio, "audio/wav"),
+                                    language="ko",
+                                )
+                                spoken_question = transcription.text.strip()
+                            if not spoken_question:
+                                st.warning("음성을 인식하지 못했어요. 다시 녹음해주세요.")
+                            else:
+                                st.session_state.last_transcript = spoken_question
+                                st.info(f"인식된 질문: {spoken_question}")
+                                handle_home_request(spoken_question, user_name)
+                                st.rerun()
+                    except Exception as exc:
+                        st.error(f"음성 질문 처리 오류: {exc}")
+    with cal_col:
+        with st.popover("📅", help="월간 미니 달력 열기"):
+            if "home_calendar_cursor" not in st.session_state:
+                st.session_state.home_calendar_cursor = date.today().replace(day=1).isoformat()
+            cursor = date.fromisoformat(st.session_state.home_calendar_cursor)
+            prev_col, month_col, next_col = st.columns([1, 3, 1], vertical_alignment="center")
+            with prev_col:
+                if st.button("◀", key="home_mini_prev"):
+                    st.session_state.home_calendar_cursor = (
+                        cursor - timedelta(days=1)
+                    ).replace(day=1).isoformat()
+                    st.rerun()
+            with month_col:
+                st.markdown(f"**{cursor.year}년 {cursor.month}월**")
+            with next_col:
+                if st.button("▶", key="home_mini_next"):
+                    st.session_state.home_calendar_cursor = (
+                        cursor.replace(day=28) + timedelta(days=5)
+                    ).replace(day=1).isoformat()
+                    st.rerun()
+            st.markdown("""<style>
+            div[data-testid="stPopoverBody"] {min-width:360px;}
+            .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#eef2f7;border-radius:5px}
+            .cal-day{min-height:42px;padding:4px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
+            .cal-other{opacity:.3}.cal-today{outline:2px solid #4a86bd}
+            .cal-num{font-size:11px;font-weight:700;margin-bottom:3px}
+            .cal-chip{font-size:9px;line-height:1.2;padding:2px;margin:2px 0;border-radius:3px;overflow-wrap:anywhere}
+            .cal-task{background:#fff0d7;color:#8a4300}
+            .cal-meeting{background:#e1f1ff;color:#164b76}
+            .cal-more{font-size:9px}
+            </style>""", unsafe_allow_html=True)
+            st.markdown(render_month_calendar(st.session_state.events, cursor), unsafe_allow_html=True)
             st.button("전체 일정 관리 열기", key="home_open_calendar",
                       on_click=navigate_to, args=(PAGES[4],))
-    with hint_col:
-        st.caption("🎙️ 음성 질문  ·  📅 미니 달력")
 
     question = st.chat_input("에이블에게 메시지를 보내세요...")
     if question:
         try:
-            with st.spinner("에이블이 답변을 준비하고 있어요..."):
-                ask_ai(f"[현재 사용자: {user_name}]\n{question}", st.session_state.document)
+            handle_home_request(question, user_name)
             st.rerun()
         except Exception as exc:
-            st.error(f"AI 응답 오류: {exc}")
+            st.error(f"AI 요청 오류: {exc}")
     st.caption("왼쪽 위 메뉴(☰)를 열면 회의록 원클릭·일정·이메일 기능을 사용할 수 있어요.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
     st.subheader("✨ 회의록 원클릭 분석")
-    st.caption("한 번에 요약·업무 추출·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
+    st.caption("사용자가 분석을 지시하면 요약·업무·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
     one_file = st.file_uploader("회의록 TXT 파일", type=["txt"], key="oneclick_txt",
                                 on_change=queue_meeting_upload, args=("oneclick_txt",))
     base_day = st.date_input("회의 날짜 (상대 날짜 해석 기준)", value=date.today(), key="oneclick_meeting_day")
@@ -741,11 +796,11 @@ if selected_page == PAGES[1]:
     if "oneclick_google_ids" not in st.session_state:
         st.session_state.oneclick_google_ids = {}
 
-    st.caption("TXT 파일을 한 번 올리면 자동 분석됩니다. Google Calendar 등록과 메일 발송은 별도 승인합니다.")
+    st.caption("파일 첨부만으로는 실행되지 않습니다. '현재 회의록 분석' 버튼을 눌러야 분석합니다. 등록과 발송은 별도 승인합니다.")
     if st.session_state.get("upload_warning"):
         st.warning(st.session_state.upload_warning)
-    rerun_analysis = st.button("🔄 현재 회의록 다시 분석", key="oneclick_run")
-    if rerun_analysis or st.session_state.get("analysis_queued", False):
+    rerun_analysis = st.button("✨ 현재 회의록 전체 분석", key="oneclick_run")
+    if rerun_analysis:
         if not st.session_state.document.strip():
             st.warning("먼저 회의록 TXT 파일을 업로드해주세요.")
         else:
@@ -1184,8 +1239,8 @@ if selected_page == PAGES[5]:
     st.caption("LLM이 요청 시 초안을 생성하고, 실제 발송은 사용자가 승인한 후에만 실행합니다.")
 
     # 자격 정보 존재 여부만 안내 (실제 값은 노출하지 않음)
-    gmail_address = os.getenv("GMAIL_ADDRESS") or st.secrets.get("GMAIL_ADDRESS", "")
-    gmail_password = os.getenv("GMAIL_APP_PASSWORD") or st.secrets.get("GMAIL_APP_PASSWORD", "")
+    gmail_address = config("GMAIL_ADDRESS")
+    gmail_password = config("GMAIL_APP_PASSWORD")
     if not (gmail_address and gmail_password):
         st.warning("GMAIL_ADDRESS, GMAIL_APP_PASSWORD를 Streamlit Secrets에 등록해야 실제 발송됩니다.")
 
@@ -1307,4 +1362,3 @@ if selected_page == PAGES[6]:
             st.error(f"일정 조회 실패: {exc}")
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
-        st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
