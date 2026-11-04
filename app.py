@@ -561,9 +561,11 @@ if "able_page" not in st.session_state:
 with st.sidebar:
     st.markdown("### ✦ ABLE")
     st.caption("AI 업무비서")
+    # 홈 버튼으로 페이지 이동한 경우에도 메뉴 상태를 동기화
+    if st.session_state.get("able_navigation") != st.session_state.able_page:
+        st.session_state.able_navigation = st.session_state.able_page
     selected_page = st.radio(
         "메뉴", PAGES,
-        index=PAGES.index(st.session_state.able_page),
         key="able_navigation",
         label_visibility="collapsed"
     )
@@ -597,6 +599,84 @@ if selected_page == PAGES[0]:
     for message in st.session_state.messages[-10:]:
         with st.chat_message(message["role"]):
             st.write(message["content"])
+    # 홈에서도 회의록을 첨부할 수 있도록 추가
+    home_file = st.file_uploader(
+        "📎 회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
+        help="파일을 첨부한 뒤 질문하거나 회의록 원클릭 분석으로 이동하세요."
+    )
+    if home_file is not None:
+        home_document = extract_txt(home_file)
+        if (st.session_state.doc_name != home_file.name
+                or st.session_state.document != home_document):
+            st.session_state.document = home_document
+            st.session_state.doc_name = home_file.name
+            st.session_state.tasks = []
+            st.session_state.pending_events = []
+            st.session_state.oneclick_summary = ""
+            st.session_state.oneclick_approved = False
+        st.caption(f"첨부 완료: {home_file.name} · {len(home_document):,}자")
+        if st.button("✨ 이 회의록 원클릭 분석하기", type="primary", use_container_width=True):
+            st.session_state.able_page = PAGES[1]
+            st.rerun()
+    elif st.session_state.document:
+        st.caption(f"현재 회의록: {st.session_state.doc_name or '이름 없음'}")
+
+    # 홈 메시지창 바로 위에 음성 녹음 및 미니 달력 버튼 배치
+    st.markdown("""<style>
+    div[data-testid="stPopover"] button {border-radius:999px;}
+    </style>""", unsafe_allow_html=True)
+    mic_col, cal_col, hint_col = st.columns([1, 1, 8], vertical_alignment="center")
+    with mic_col:
+        with st.popover("🎙️", help="마이크로 음성 질문하기"):
+            st.markdown("**음성으로 에이블에게 질문하기**")
+            home_recording = st.audio_input("마이크 녹음", key="home_voice_recording")
+            if st.button("음성 질문 보내기", key="home_voice_send", type="primary",
+                         disabled=home_recording is None):
+                try:
+                    with st.spinner("음성을 텍스트로 변환하는 중..."):
+                        transcription = client.audio.transcriptions.create(
+                            model="whisper-1",
+                            file=("home_recording.wav", home_recording.getvalue()),
+                            language="ko"
+                        )
+                        spoken_question = transcription.text.strip()
+                        st.session_state.last_transcript = spoken_question
+                    if spoken_question:
+                        with st.spinner("에이블이 답변하는 중..."):
+                            ask_ai(f"[현재 사용자: {user_name}]\\n{spoken_question}",
+                                   st.session_state.document)
+                        st.rerun()
+                    else:
+                        st.warning("음성을 인식하지 못했어요. 다시 녹음해주세요.")
+                except Exception as exc:
+                    st.error(f"음성 질문 오류: {exc}")
+    with cal_col:
+        with st.popover("📅", help="미니 달력 열기"):
+            st.markdown("**미니 캘린더**")
+            selected_home_date = st.date_input(
+                "날짜 선택", value=date.today(), key="home_mini_date"
+            )
+            matching_events = []
+            for home_event in st.session_state.events:
+                try:
+                    normalized = normalize_event(home_event)
+                    if normalized["date"] == selected_home_date.isoformat():
+                        matching_events.append(normalized)
+                except (ValueError, TypeError, KeyError):
+                    continue
+            if matching_events:
+                st.caption(f"{selected_home_date:%Y-%m-%d} · {len(matching_events)}개 일정")
+                for home_event in matching_events:
+                    st.write("• " + home_event["title"])
+            else:
+                st.caption("선택한 날짜에 등록된 내부 일정이 없어요.")
+            st.caption("이 미니 달력에는 에이블 내부 일정이 표시됩니다.")
+            if st.button("전체 일정 관리 열기", key="home_open_calendar"):
+                st.session_state.able_page = PAGES[4]
+                st.rerun()
+    with hint_col:
+        st.caption("🎙️ 음성 질문  ·  📅 미니 달력")
+
     question = st.chat_input("에이블에게 메시지를 보내세요...")
     if question:
         try:
@@ -613,6 +693,8 @@ if selected_page == PAGES[1]:
     st.caption("한 번에 요약·업무 추출·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
     one_file = st.file_uploader("회의록 TXT 파일", type=["txt"], key="oneclick_txt")
     base_day = st.date_input("회의 날짜 (상대 날짜 해석 기준)", value=date.today(), key="oneclick_meeting_day")
+    if one_file is None and st.session_state.document:
+        st.info(f"홈에서 첨부한 회의록이 준비되어 있습니다: {st.session_state.doc_name}")
     if one_file is not None:
         new_document = extract_txt(one_file)
         if (st.session_state.doc_name != one_file.name or st.session_state.document != new_document):
@@ -1201,3 +1283,4 @@ if selected_page == PAGES[6]:
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
         st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
+
