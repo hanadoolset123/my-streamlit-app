@@ -693,7 +693,7 @@ with st.sidebar:
 
 st.markdown("""<style>
 .block-container{max-width:1050px;padding-top:1.1rem}
-.able-home{min-height:105px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 12px 26px}
+.able-home{min-height:290px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 12px 14px}
 .able-orb{height:84px;width:84px;border-radius:26px;background:#eef4fb;display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:22px}
 .able-home h1{font-size:2.2rem;letter-spacing:-.06em;margin:0 0 10px;font-weight:750}
 .able-home p{color:#788596;font-size:1rem;margin:0}
@@ -707,6 +707,7 @@ st.markdown("""<style>
 if selected_page == PAGES[0]:
     # 홈 화면
     st.markdown("""<div class="able-home">
+      <div class="able-orb">✦</div>
       <h1>무엇을 도와드릴까요?</h1>
       <p>당신의 AI 개인비서, ABLE</p>
     </div>""", unsafe_allow_html=True)
