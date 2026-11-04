@@ -802,32 +802,52 @@ if selected_page == PAGES[0]:
                       on_click=navigate_to, args=(PAGES[3],))
 
     with mic_col:
-        with st.popover("🎙️", help="마이크로 음성 질문하기"):
-            st.markdown("**음성으로 에이블에게 질문하기**")
-            home_recording = st.audio_input("마이크 녹음", key="home_voice_recording")
-            if st.button("음성 질문 보내기", key="home_voice_send", type="primary", use_container_width=True):
-                if home_recording is None:
-                    st.warning("먼저 음성을 녹음해주세요.")
-                else:
-                    try:
-                        with st.spinner("음성을 인식하고 있어요..."):
-                            transcription = client.audio.transcriptions.create(
-                                model="whisper-1",
-                                file=("home_recording.wav", home_recording.getvalue(), "audio/wav"),
-                                language="ko",
-                            )
-                        spoken_question = transcription.text.strip()
-                        if spoken_question:
-                            st.session_state.last_transcript = spoken_question
-                            handle_home_request(spoken_question, user_name)
-                            st.rerun()
-                        else:
-                            st.warning("음성을 인식하지 못했습니다.")
-                    except Exception as exc:
-                        st.error(f"음성 질문 처리 오류: {exc}")
+        if st.button("🎙️", key="able_voice_toggle", help="음성 질문 창 열기"):
+            st.session_state.able_voice_open = not st.session_state.get("able_voice_open", False)
     with send_col:
         st.button("➤", key="able_inline_send", help="질문 전송",
                   use_container_width=True, on_click=queue_inline_question)
+
+    # 음성 질문은 팝오버 밖에 배치하여 녹음 중 UI가 닫히지 않게 합니다.
+    if st.session_state.get("able_voice_open", False):
+        with st.container(border=True):
+            st.markdown("**🎙️ 음성으로 에이블에게 질문하기**")
+            st.caption("마이크를 눌러 녹음하고 중지한 뒤 '음성 질문 보내기'를 누르세요. 브라우저의 마이크 접근을 허용해야 합니다.")
+            recording = st.audio_input("마이크 녹음", key="able_voice_recorder", sample_rate=16000)
+            # 마이크를 사용할 수 없는 환경을 위한 대체 경로
+            fallback_audio = st.file_uploader(
+                "녹음이 안 된다면 음성 파일 업로드 (선택)",
+                type=["wav", "mp3", "m4a", "webm", "ogg"],
+                key="able_voice_audio_upload",
+            )
+            audio_source = recording if recording is not None else fallback_audio
+            if audio_source is not None:
+                st.success("음성 파일 준비 완료. 아래 버튼으로 전송하세요.")
+            if st.button("음성 질문 보내기", key="able_voice_send", type="primary", disabled=audio_source is None):
+                try:
+                    audio_bytes = audio_source.getvalue()
+                    if not audio_bytes:
+                        st.error("녹음된 음성이 비어 있습니다. 다시 녹음해주세요.")
+                    else:
+                        file_name = getattr(audio_source, "name", "question.wav") or "question.wav"
+                        with st.spinner("음성을 글자로 변환하고 있어요..."):
+                            transcript = client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=(file_name, audio_bytes),
+                                language="ko",
+                            )
+                        spoken_question = (transcript.text or "").strip()
+                        if not spoken_question:
+                            st.warning("음성을 인식하지 못했어요. 다시 녹음해주세요.")
+                        else:
+                            st.session_state.last_transcript = spoken_question
+                            st.info(f"인식된 질문: {spoken_question}")
+                            with st.spinner("에이블이 답변을 준비하고 있어요..."):
+                                handle_home_request(spoken_question, user_name)
+                            st.session_state.able_voice_open = False
+                            st.rerun()
+                except Exception as exc:
+                    st.error(f"음성 질문 처리 오류: {exc}")
 
     if st.session_state.pop("able_empty_send", False):
         st.warning("질문을 입력해주세요.")
