@@ -639,7 +639,7 @@ def analyze_meeting_automatically(meeting_day):
 
 
 # 숨김 사이드바 메뉴 + 미니멀 홈 화면
-PAGES = ["🏠 홈", "✨ 회의록 원클릭", "🎙 AI 비서", "🎯 업무 우선순위", "📅 일정 관리", "✉️ 이메일", "🔗 Google Calendar"]
+PAGES = ["🏠 홈", "✨ 회의록 원클릭", "🎯 업무 우선순위", "📅 일정 관리", "✉️ 이메일", "🔗 Google Calendar"]
 if "able_navigation" not in st.session_state:
     st.session_state.able_navigation = PAGES[0]
 
@@ -674,7 +674,7 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 if selected_page == PAGES[0]:
-    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 음성/월간달력 수정본")
+    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 홈/AI 비서 통합본")
     st.markdown("""<div class="able-home">
       <div class="able-orb">✦</div>
       <h1>무엇을 도와드릴까요?</h1>
@@ -695,6 +695,42 @@ if selected_page == PAGES[0]:
         st.caption("파일만 준비했어요. 아래 메시지창에 '회의록 전체 분석해줘'라고 입력하거나 마이크로 말해보세요.")
     elif st.session_state.document:
         st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
+
+    # 기존 AI 비서 화면의 음성 답변(TTS)을 홈으로 통합
+    home_tts_enabled = st.toggle("🔊 AI 답변 음성 재생", value=False, key="home_tts_enabled")
+    if st.session_state.get("last_answer") and home_tts_enabled:
+        last_answer = st.session_state.last_answer
+        if st.session_state.get("home_tts_answer") != last_answer:
+            try:
+                with st.spinner("음성 답변을 준비하고 있어요..."):
+                    st.session_state.last_audio = make_speech(last_answer)
+                    st.session_state.home_tts_answer = last_answer
+            except Exception as exc:
+                st.warning(f"음성 답변 생성 실패: {exc}")
+        if st.session_state.get("last_audio"):
+            st.audio(st.session_state.last_audio, format="audio/mp3")
+
+    with st.expander("음성 파일로 질문하기 (MP3 / M4A / WAV)"):
+        uploaded_voice = st.file_uploader("음성 파일 첨부", type=["mp3", "m4a", "wav"], key="home_voice_file")
+        if st.button("음성 파일 질문 보내기", key="home_voice_file_send"):
+            if uploaded_voice is None:
+                st.warning("먼저 음성 파일을 첨부해주세요.")
+            else:
+                try:
+                    with st.spinner("음성을 인식하고 있어요..."):
+                        recognized = client.audio.transcriptions.create(
+                            model="whisper-1", file=(uploaded_voice.name, uploaded_voice.getvalue())
+                        ).text.strip()
+                    if recognized:
+                        st.session_state.last_transcript = recognized
+                        handle_home_request(recognized, user_name)
+                        st.rerun()
+                    else:
+                        st.warning("음성을 인식하지 못했어요.")
+                except Exception as exc:
+                    st.error(f"음성 파일 처리 오류: {exc}")
+        if st.session_state.get("last_transcript"):
+            st.caption(f"최근 음성 인식: {st.session_state.last_transcript}")
 
     # 마이크는 녹음 후 '음성 질문 보내기'를 눌렀을 때만 실행됩니다.
     # 달력은 날짜 입력칸 대신 월간 달력을 팝오버에 바로 표시합니다.
@@ -767,7 +803,7 @@ if selected_page == PAGES[0]:
             </style>""", unsafe_allow_html=True)
             st.markdown(render_month_calendar(st.session_state.events, cursor), unsafe_allow_html=True)
             st.button("전체 일정 관리 열기", key="home_open_calendar",
-                      on_click=navigate_to, args=(PAGES[4],))
+                      on_click=navigate_to, args=(PAGES[3],))
 
     question = st.chat_input("에이블에게 메시지를 보내세요...")
     if question:
@@ -910,71 +946,12 @@ if selected_page == PAGES[1]:
                     st.error(f"이메일 발송 실패: {exc}")
 
 if selected_page == PAGES[2]:
-    st.subheader("음성 명령과 회의록 분석")
-    st.caption("TXT 회의록 + 음성 입력 또는 텍스트 질문 · 음성 인식 결과 확인")
-    uploaded=st.file_uploader("회의록 TXT 업로드",type=["txt"],key="meeting_txt")
-    if uploaded is not None:
-        content=extract_txt(uploaded)
-        if st.session_state.doc_name != uploaded.name or st.session_state.document != content:
-            st.session_state.document=content
-            st.session_state.doc_name=uploaded.name
-            st.session_state.tasks=[]
-            st.session_state.pending_events=[]
-            st.session_state.oneclick_summary=""
-        st.success(f"회의록 준비 완료: {uploaded.name} ({len(content):,}자)")
-    mic=st.audio_input("음성 명령 녹음")
-    audio_file=st.file_uploader("또는 음성 파일(m4a, mp3, wav) 업로드",type=["m4a","mp3","wav"],key="audio_up")
-    typed=st.text_input("텍스트로 질문",placeholder="에이블, 회의 내용을 요약하고 김 대리의 업무를 알려줘")
-    cc1,cc2=st.columns([2,1])
-    with cc1:
-        run=st.button("✨ AI 비서 실행",type="primary",use_container_width=True)
-    with cc2:
-        auto_tts=st.checkbox("음성 답변 재생",value=True)
-    if run:
-        question=typed.strip()
-        audio_to_use=audio_file or mic
-        if audio_to_use:
-            try:
-                raw=audio_to_use.getvalue()
-                transcription=client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=(audio_to_use.name or "recording.wav",raw))
-                question=transcription.text
-                st.session_state.last_transcript=question
-            except Exception as exc:
-                st.error(f"STT 오류: {exc}")
-        if not question:
-            st.warning("질문을 입력하거나 음성을 녹음하세요.")
-        else:
-            st.info(f"🎤 인식된 질문: {question}")
-            try:
-                with st.spinner("에이블이 분석 중입니다..."):
-                    # 시스템 역할에 이름 맥락 반영; 회의록에 없는 사실을 만들지 않음
-                    answer=ask_ai(f"[현재 사용자: {user_name}]\n{question}",st.session_state.document)
-                    st.session_state.last_audio=make_speech(answer) if auto_tts else None
-            except Exception as exc:
-                st.error(f"AI 호출 오류: {exc}")
-    if st.session_state.last_transcript:
-        with st.expander("최근 STT 인식 결과"):
-            st.write(st.session_state.last_transcript)
-    if st.session_state.last_answer:
-        st.markdown("#### 에이블의 답변")
-        st.write(st.session_state.last_answer)
-        if st.session_state.last_audio:
-            st.audio(st.session_state.last_audio,format="audio/mp3")
-    with st.expander(f"대화 히스토리 · 최근 {len(st.session_state.messages)}개 메시지"):
-        for msg in st.session_state.messages:
-            st.markdown(f"**{'나' if msg['role']=='user' else '에이블'}:** {msg['content']}")
-
-
-
-if selected_page == PAGES[3]:
     st.subheader("업무 우선순위 분석")
     st.caption("회의록에서 할 일을 추출하고 중요도를 직접 조정하세요. 마감일이 없는 업무는 긴급하다고 추정하지 않습니다.")
     meeting_date=st.date_input("회의 기준일",value=date.today(),key="task_meeting_date")
     if st.button("✨ 회의록에서 업무 자동 추출",type="primary"):
         if not st.session_state.document:
-            st.warning("먼저 AI 비서 탭에서 회의록을 업로드해주세요.")
+            st.warning("먼저 홈에서 회의록을 첨부해주세요.")
         else:
             try:
                 with st.spinner("담당자·업무·기한을 추출하고 있습니다..."):
@@ -1051,7 +1028,7 @@ if selected_page == PAGES[3]:
         st.info("회의록 업로드 후 '업무 자동 추출'을 실행하면 업무 카드와 4분면이 나타납니다.")
 
 
-if selected_page == PAGES[4]:
+if selected_page == PAGES[3]:
     st.subheader("📅 확정 일정 캘린더")
     st.caption("회의록 일정 승인 + 업무 마감일 반영 + 충돌 탐지 / Google Calendar 별도 탭에서 동기화 가능")
 
@@ -1059,7 +1036,7 @@ if selected_page == PAGES[4]:
     meeting_day = st.date_input("회의 날짜 (상대 날짜 해석 기준)", value=date.today(), key="meeting_day")
     if st.button("✨ 회의록에서 일정 후보 추출", type="primary"):
         if not st.session_state.document:
-            st.warning("AI 비서 탭에서 회의록을 먼저 업로드해주세요.")
+            st.warning("홈에서 회의록을 먼저 첨부해주세요.")
         else:
             try:
                 with st.spinner("일정을 추출 중입니다..."):
@@ -1234,7 +1211,7 @@ if selected_page == PAGES[4]:
             st.error(f"CSV 가져오기 실패: {exc}")
 
 
-if selected_page == PAGES[5]:
+if selected_page == PAGES[4]:
     st.subheader("✉️ 이메일 발송")
     st.caption("LLM이 요청 시 초안을 생성하고, 실제 발송은 사용자가 승인한 후에만 실행합니다.")
 
@@ -1247,7 +1224,7 @@ if selected_page == PAGES[5]:
     if st.session_state.mail_draft:
         st.info("AI가 작성한 메일 초안입니다. 주소·제목·본문을 확인하고 승인해주세요.")
     else:
-        st.caption("AI 비서 탭에서 '이메일로 보내줘'라고 요청하거나 아래 칸에 직접 작성할 수 있습니다.")
+        st.caption("홈에서 '이메일로 보내줘'라고 요청하거나 아래 칸에 직접 작성할 수 있습니다.")
 
     draft = st.session_state.mail_draft or {}
     if st.button("최근 AI 답변을 본문에 불러오기", key="mail_use_last_answer"):
@@ -1287,7 +1264,7 @@ if selected_page == PAGES[5]:
 # ==========================================
 # Google Calendar integration tab
 # ==========================================
-if selected_page == PAGES[6]:
+if selected_page == PAGES[5]:
     st.subheader("🔗 Google Calendar 연결 및 동기화")
     st.caption("내부 캘린더의 확정 일정을 선택해서 구글 캘린더에 등록합니다. 자동 업로드하지 않습니다.")
     try:
@@ -1362,3 +1339,4 @@ if selected_page == PAGES[6]:
             st.error(f"일정 조회 실패: {exc}")
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
+        st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
