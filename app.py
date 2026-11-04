@@ -709,20 +709,100 @@ with st.sidebar:
 
 st.markdown("""<style>
 .block-container{max-width:1050px;padding-top:1.1rem}
-.able-home{min-height:290px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 12px 14px}
+.able-home{min-height:105px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 12px 26px}
 .able-orb{height:84px;width:84px;border-radius:26px;background:#eef4fb;display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:22px}
 .able-home h1{font-size:2.2rem;letter-spacing:-.06em;margin:0 0 10px;font-weight:750}
 .able-home p{color:#788596;font-size:1rem;margin:0}
-[data-testid="stSidebar"]{border-right:1px solid #e8edf2}
+.able-otter-home{margin-top:-6px} [data-testid="stSidebar"]{border-right:1px solid #e8edf2}
 [data-testid="stChatInput"]{max-width:790px;margin:auto}
 /* 월간 미니 달력이 7열로 보이도록 팝오버 넓이 확보 */
 [data-testid="stPopoverBody"]:has(.cal-grid){min-width:min(560px,90vw)}
 </style>""", unsafe_allow_html=True)
 
+def render_able_otter():
+    """원본 홈의 아이콘만 대체하는 인터랙티브 전신 수달. 외부 전송 없음."""
+    import streamlit.components.v1 as components
+    components.html(r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"/>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:transparent;overflow:hidden}
+.stage{position:relative;height:226px;display:flex;align-items:center;justify-content:center;user-select:none}
+.halo{position:absolute;bottom:9px;width:180px;height:50px;border-radius:50%;background:radial-gradient(ellipse,rgba(155,132,246,.22),transparent 70%);filter:blur(7px)}
+.otter{height:214px;width:210px;filter:drop-shadow(0 8px 9px rgba(33,42,75,.13));animation:bob 3.5s ease-in-out infinite;transform-origin:50% 90%}
+@keyframes bob{0%,100%{transform:translateY(1px)}50%{transform:translateY(-5px)}}
+.eye-lid{transform-box:fill-box;transform-origin:center;animation:blink 6.5s infinite}
+@keyframes blink{0%,43%,47%,100%{transform:scaleY(0)}45%{transform:scaleY(1)}}
+.pupil{transition:transform .12s ease-out}
+.arm{transform-origin:142px 140px;animation:wave 4.5s ease-in-out infinite}
+@keyframes wave{0%,75%,100%{transform:rotate(0)}80%,90%{transform:rotate(-16deg)}85%,95%{transform:rotate(10deg)}}
+.z{position:absolute;top:22px;left:calc(50% + 54px);font:700 22px system-ui;color:#8a6de8;opacity:0;animation:floatz 2.2s infinite}
+.z.two{top:3px;left:calc(50% + 83px);animation-delay:.7s;font-size:16px}
+@keyframes floatz{0%{transform:translateY(8px);opacity:0}35%{opacity:1}100%{transform:translateY(-16px);opacity:0}}
+.stage.sleep .z{opacity:1}.stage:not(.sleep) .z{display:none}
+.stage.sleep .otter{animation:sleep-breathe 3s ease-in-out infinite}
+@keyframes sleep-breathe{0%,100%{transform:translateY(2px) rotate(-2deg)}50%{transform:translateY(4px) rotate(0deg)}}
+.stage.sleep .arm{animation:none}
+.stage.sleep .eye-open{display:none}.stage:not(.sleep) .eye-closed{display:none}
+@media(prefers-reduced-motion:reduce){.otter,.arm,.eye-lid,.z{animation:none!important}}
+</style></head><body>
+<div class="stage" id="stage" role="img" aria-label="정장을 입고 눈동자가 커서를 따라 움직이는 에이블 수달 비서. 일정 시간 활동이 없으면 잠듭니다.">
+<div class="halo"></div><div class="z">Z</div><div class="z two">z</div>
+<svg class="otter" viewBox="0 0 210 220" xmlns="http://www.w3.org/2000/svg">
+<!-- tail and shoes -->
+<path d="M68 185 Q28 199 29 173 Q21 193 40 204 Q63 210 80 194" fill="#a96947" stroke="#8f563d" stroke-width="2"/>
+<ellipse cx="83" cy="209" rx="23" ry="9" fill="#242b40"/><ellipse cx="127" cy="209" rx="23" ry="9" fill="#242b40"/>
+<!-- legs -->
+<path d="M69 166 L143 166 L138 202 L112 202 L106 178 L99 202 L75 202 Z" fill="#263653"/>
+<!-- suit body -->
+<path d="M72 124 Q57 131 57 163 L65 182 Q104 193 148 181 L155 151 Q150 127 133 124Z" fill="#2c3e61" stroke="#24334f" stroke-width="2"/>
+<path d="M87 123 L105 172 L122 123" fill="#f8fafc"/>
+<path d="M105 137 L98 148 L105 172 L113 148 Z" fill="#4d84da"/>
+<path d="M85 126 L72 141 L91 154 L101 177 L92 132Z" fill="#40547a"/>
+<path d="M124 126 L139 141 L121 154 L110 177 L117 132Z" fill="#40547a"/>
+<circle cx="118" cy="169" r="2" fill="#e4d9ba"/><circle cx="117" cy="181" r="2" fill="#e4d9ba"/>
+<text x="133" y="151" font-size="11" font-weight="bold" fill="#e5c97e">A</text>
+<!-- left arm -->
+<path d="M69 133 Q51 131 47 154 L44 174 Q49 185 60 178 L72 149Z" fill="#2c3e61" stroke="#24334f" stroke-width="2"/>
+<ellipse cx="49" cy="179" rx="10" ry="10" fill="#ad7656"/>
+<!-- right arm waving -->
+<g class="arm"><path d="M139 132 Q152 126 163 109 L168 98 Q181 94 184 105 Q182 123 162 151 L149 157Z" fill="#2c3e61" stroke="#24334f" stroke-width="2"/>
+<ellipse cx="174" cy="97" rx="13" ry="15" fill="#b47b59"/><path d="M166 91 l-2 -9 M174 88 l2 -10 M182 92 l7 -6" fill="none" stroke="#935f45" stroke-width="2.5" stroke-linecap="round"/></g>
+<!-- head ears -->
+<circle cx="55" cy="48" r="20" fill="#a56b4b"/><circle cx="55" cy="48" r="10" fill="#d9a58a"/>
+<circle cx="154" cy="48" r="20" fill="#a56b4b"/><circle cx="154" cy="48" r="10" fill="#d9a58a"/>
+<ellipse cx="105" cy="77" rx="67" ry="66" fill="#b77b57"/>
+<path d="M48 87 Q60 133 105 136 Q151 133 163 88 Q140 105 105 108 Q69 105 48 87" fill="#f4dfcb"/>
+<ellipse cx="75" cy="83" rx="26" ry="24" fill="#f7e9dc"/><ellipse cx="135" cy="83" rx="26" ry="24" fill="#f7e9dc"/>
+<!-- eyes open -->
+<g class="eye-open"><ellipse cx="79" cy="69" rx="15" ry="19" fill="#fff"/><ellipse cx="132" cy="69" rx="15" ry="19" fill="#fff"/>
+<g class="pupil" id="p1"><circle cx="79" cy="70" r="9" fill="#20212b"/><circle cx="82" cy="66" r="3.5" fill="#fff"/></g>
+<g class="pupil" id="p2"><circle cx="132" cy="70" r="9" fill="#20212b"/><circle cx="135" cy="66" r="3.5" fill="#fff"/></g>
+<path class="eye-lid" d="M64 69 Q79 52 94 69 M117 69 Q132 52 147 69" fill="none" stroke="#b77b57" stroke-width="22"/></g>
+<!-- sleeping eyes -->
+<g class="eye-closed"><path d="M65 71 Q79 83 93 71 M118 71 Q132 83 146 71" fill="none" stroke="#4d302a" stroke-width="3.5" stroke-linecap="round"/></g>
+<!-- nose and smile -->
+<ellipse cx="105" cy="94" rx="12" ry="8" fill="#40302d"/><path d="M105 100 Q93 119 82 105 M105 100 Q117 119 128 105" fill="none" stroke="#7d4d3e" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="68" cy="99" rx="9" ry="5" fill="#efb4a6" opacity=".5"/><ellipse cx="143" cy="99" rx="9" ry="5" fill="#efb4a6" opacity=".5"/>
+<!-- whiskers -->
+<path d="M58 102 L24 96 M58 108 L21 112 M153 102 L188 96 M153 108 L189 112" stroke="#a16f5b" stroke-width="1.5" stroke-linecap="round"/>
+</svg></div>
+<script>
+(function(){
+const stage=document.getElementById('stage'), pupils=[document.getElementById('p1'),document.getElementById('p2')];
+let last=Date.now(), asleep=false;
+function wake(){last=Date.now();if(asleep){asleep=false;stage.classList.remove('sleep')}}
+function look(x,y){if(asleep)return;const r=stage.getBoundingClientRect();const dx=Math.max(-5,Math.min(5,(x-(r.left+r.width/2))/25));const dy=Math.max(-4,Math.min(4,(y-(r.top+r.height*.37))/25));pupils.forEach(p=>p.style.transform=`translate(${dx}px,${dy}px)`)}
+window.addEventListener('mousemove',e=>{wake();look(e.clientX,e.clientY)},{passive:true});
+window.addEventListener('pointerdown',wake,{passive:true});window.addEventListener('keydown',wake);
+// iframe 밖에서도 마우스 이동을 감지할 수 있는 경우 부모 이벤트를 사용합니다.
+try{window.parent.addEventListener('mousemove',e=>{wake();const r=window.frameElement.getBoundingClientRect();look(e.clientX-r.left,e.clientY-r.top)},{passive:true});window.parent.addEventListener('keydown',wake)}catch(e){}
+setInterval(()=>{if(Date.now()-last>75000&&!asleep){asleep=true;stage.classList.add('sleep');pupils.forEach(p=>p.style.transform='translate(0,0)')}},1000);
+})();
+</script></body></html>''', height=226, scrolling=False)
+
 if selected_page == PAGES[0]:
-    st.caption("ABLE 업데이트 확인 · 2026-11-04 · Enter 전송 및 간격 조정")
-    st.markdown("""<div class="able-home">
-      <div class="able-orb">✦</div>
+    # 홈 화면 디자인 버전: 전신 수달 + 커서 추적 + 75초 유휴 수면
+    render_able_otter()
+    st.markdown("""<div class="able-home able-otter-home">
       <h1>무엇을 도와드릴까요?</h1>
       <p>당신의 AI 개인비서, ABLE</p>
     </div>""", unsafe_allow_html=True)
