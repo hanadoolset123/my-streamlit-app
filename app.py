@@ -67,24 +67,8 @@ def config(name, default=""):
             return default
         raise
 
-app_password = config("ABLE_APP_PASSWORD")
-if not app_password:
-    st.error("Streamlit Secrets에 ABLE_APP_PASSWORD를 설정해주세요.")
-    st.stop()
-if not st.session_state.get("authenticated", False):
-    st.title("🔒 ABLE 로그인")
-    with st.form("able_login"):
-        supplied = st.text_input("비밀번호", type="password")
-        do_login = st.form_submit_button("로그인")
-    if do_login:
-        if hmac.compare_digest(supplied, str(app_password)):
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("비밀번호가 올바르지 않습니다.")
-    st.stop()
-
-
+# 로그인 화면 제거: 앱을 열면 바로 홈 화면이 표시됩니다.
+# 주의: 공개 URL 사용자 모두가 앱에 접근할 수 있습니다.
 
 openai_api_key = config("OPENAI_API_KEY")
 if not openai_api_key:
