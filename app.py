@@ -50,6 +50,14 @@ if "last_stt" not in st.session_state:
 if "last_audio" not in st.session_state:
     st.session_state.last_audio = None
 
+# 이메일 발송 여부 질문 상태
+if "show_email_question" not in st.session_state:
+    st.session_state.show_email_question = False
+
+# 마지막 요약 내용 저장
+if "last_summary" not in st.session_state:
+    st.session_state.last_summary = ""
+
 # =========================
 # 3. 이메일 발송 함수
 # =========================
