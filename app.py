@@ -867,7 +867,6 @@ if selected_page == PAGES[0]:
         if st.session_state.get("last_audio"):
             st.audio(st.session_state.last_audio, format="audio/mp3")
 
-    st.caption("왼쪽 📎 버튼으로 회의록을 첨부하고, 음성 설정은 왼쪽 메뉴(☰)에서 이용할 수 있어요.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
