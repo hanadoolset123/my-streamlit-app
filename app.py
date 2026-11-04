@@ -144,7 +144,7 @@ def oauth_flow():
     return Flow.from_client_config(
         settings,
         scopes=SCOPES,
-        redirect_uri=redirect_uri
+        redirect_uri=redirect_uri,
         autogenerate_code_verifier=False
     )
 
