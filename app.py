@@ -62,12 +62,12 @@ if "last_summary" not in st.session_state:
 # 3. 이메일 발송 함수
 # =========================
 def send_email(to, subject, body):
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_user = os.getenv("SMTP_USER") or os.getenv("GMAIL_ADDRESS")
+    smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD")
 
     if not smtp_user or not smtp_password:
         raise ValueError(
-            "SMTP_USER와 SMTP_PASSWORD 설정이 필요합니다."
+            "Gmail 발송 계정과 앱 비밀번호 환경변수 설정이 필요합니다."
         )
 
     msg = EmailMessage()
@@ -211,6 +211,8 @@ with st.sidebar:
         st.session_state.pending_email = None
         st.session_state.last_stt = ""
         st.session_state.last_audio = None
+        st.session_state.last_summary = ""
+        st.session_state.show_email_question = False
         st.rerun()
 
 # =========================
@@ -293,6 +295,18 @@ if submit:
                 answer = get_ai_response(
                     user_text, file_text
                 )
+         
+
+            # 문서 요약 요청 시 이메일 발송 여부를 바로 표시
+            summary_requested = any(
+                word in user_text for word in ("요약", "정리", "핵심")
+            )
+            if (file_text and summary_requested
+                    and st.session_state.pending_email is None):
+                st.session_state.last_summary = answer
+                st.session_state.show_email_question = True
+            else:
+                st.session_state.show_email_question = False
 
             st.session_state.messages.extend([
                 {"role": "user", "content": user_text},
@@ -341,7 +355,7 @@ if st.session_state.pending_email is not None:
     with st.form("email_approval"):
         to = st.text_input(
             "받는 사람",
-            value=draft["to"] or lgo70140@gmail.com
+            value=draft["to"] or "lgo70140@gmail.com"
         )
         subject = st.text_input(
             "제목",
@@ -417,7 +431,7 @@ if (
     if send_yes:
 
         st.session_state.pending_email = {
-            "to": "",
+            "to": "lgo70140@gmail.com",
             "subject": "회의록 요약 및 김 대리 업무 정리",
             "body": st.session_state.last_summary
         }
@@ -429,3 +443,4 @@ if (
 
         st.session_state.show_email_question = False
         st.rerun()
+
