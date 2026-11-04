@@ -244,7 +244,8 @@ if "code" in st.query_params:
         flow = oauth_flow()
 
         flow.fetch_token(
-            code=st.query_params["code"]
+            code=st.query_params["code"],
+            code_verifier=None
         )
 
         st.session_state.google_token = json.loads(
