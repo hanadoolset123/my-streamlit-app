@@ -738,19 +738,10 @@ if selected_page == PAGES[0]:
         else:
             st.session_state.able_empty_send = True
 
-    # + 버튼을 제거하고 첨부·음성설정은 사이드바로 이동
+    # 음성 답변 설정은 사이드바에 유지하고 파일 첨부는 입력창 왼쪽으로 이동
     with st.sidebar:
-        with st.expander("📎 회의록 첨부 · 음성 설정", expanded=False):
-            home_file = st.file_uploader(
-                "회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
-                on_change=queue_meeting_upload, args=("able_home_upload",),
-                help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요."
-            )
-            st.toggle("🔊 AI 답변 음성 재생", value=False, key="home_tts_enabled")
-            if home_file is not None:
-                st.success(f"첨부 완료: {home_file.name}")
-            elif st.session_state.document:
-                st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
+        with st.expander("🔊 음성 답변 설정", expanded=False):
+            st.toggle("AI 답변 음성 재생", value=False, key="home_tts_enabled")
 
     st.markdown("""<style>
     div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
@@ -767,11 +758,23 @@ if selected_page == PAGES[0]:
     }
     .able-input-anchor {display:none}
     </style>""", unsafe_allow_html=True)
-    input_col, cal_col, mic_col, send_col = st.columns(
-        [9.3, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
+    attach_col, input_col, cal_col, mic_col, send_col = st.columns(
+        [0.62, 8.7, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
     )
-    with input_col:
+    with attach_col:
         st.markdown('<span class="able-input-anchor"></span>', unsafe_allow_html=True)
+        with st.popover("📎", help="회의록 파일 첨부"):
+            st.markdown("**회의록 파일 첨부**")
+            home_file = st.file_uploader(
+                "TXT 회의록 선택", type=["txt"], key="able_home_upload",
+                on_change=queue_meeting_upload, args=("able_home_upload",),
+                help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요."
+            )
+            if home_file is not None:
+                st.success(f"첨부 완료: {home_file.name}")
+            elif st.session_state.document:
+                st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
+    with input_col:
         st.text_input(
             "에이블에게 메시지", key="able_inline_question",
             placeholder="에이블에게 무엇이든 물어보세요...",
@@ -864,7 +867,7 @@ if selected_page == PAGES[0]:
         if st.session_state.get("last_audio"):
             st.audio(st.session_state.last_audio, format="audio/mp3")
 
-    st.caption("회의록 첨부와 음성 설정은 왼쪽 메뉴(☰)에서 이용할 수 있어요.")
+    st.caption("왼쪽 📎 버튼으로 회의록을 첨부하고, 음성 설정은 왼쪽 메뉴(☰)에서 이용할 수 있어요.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
