@@ -704,6 +704,119 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 
+# 음성 질문 컴포넌트: Chrome/Edge의 Web Speech API를 사용합니다.
+# 브라우저에서 인식된 문장만 Streamlit 서버로 전송합니다.
+ABLE_VOICE_HTML = """<div class="able-voice-wrap">
+  <button type="button" class="able-voice-btn" aria-label="음성 질문 시작" title="음성 질문 시작">🎙️</button>
+  <span class="able-voice-status" role="status" aria-live="polite"></span>
+</div>"""
+ABLE_VOICE_CSS = """
+.able-voice-wrap{display:flex;align-items:center;justify-content:center;position:relative;min-height:37px}
+.able-voice-btn{border:0;background:transparent;cursor:pointer;border-radius:50%;padding:5px 6px;font-size:16px;line-height:1.5}
+.able-voice-btn:hover{background:#eef4fb}
+.able-voice-btn.listening{background:#ffe7e7;animation:able-voice-pulse 1.3s infinite}
+.able-voice-status{position:absolute;top:37px;right:-45px;min-width:125px;max-width:220px;text-align:center;font-size:11px;color:#64748b;pointer-events:none;white-space:nowrap}
+@keyframes able-voice-pulse{50%{box-shadow:0 0 0 6px #ffeded}}
+"""
+ABLE_VOICE_JS = r"""
+export default function(component) {
+  const { parentElement, setTriggerValue } = component;
+  const btn = parentElement.querySelector('.able-voice-btn');
+  const status = parentElement.querySelector('.able-voice-status');
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let active = false;
+  let finished = false;
+  let transcript = '';
+  let stopTimer = null;
+  let maxTimer = null;
+  let manualCancel = false;
+  const show = (msg) => { status.textContent = msg; };
+  const resetTimers = () => { clearTimeout(stopTimer); clearTimeout(maxTimer); };
+  const scheduleEnd = () => {
+    clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => {
+      if (active && recognition) recognition.stop();
+    }, 1500);
+  };
+  if (!Recognition) {
+    btn.title = '이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Edge를 이용하세요.';
+    btn.onclick = () => setTriggerValue('error', '음성 인식을 지원하지 않는 브라우저입니다. Chrome 또는 Edge를 사용해 주세요.');
+    return;
+  }
+  btn.onclick = () => {
+    if (active) {
+      // 다시 누르면 취소합니다. 질문이 잘못 전송되지 않도록 합니다.
+      manualCancel = true;
+      if (recognition) recognition.abort();
+      return;
+    }
+    recognition = new Recognition();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+    transcript = '';
+    finished = false;
+    manualCancel = false;
+    recognition.onstart = () => {
+      active = true;
+      btn.classList.add('listening');
+      btn.textContent = '🔴';
+      btn.setAttribute('aria-label', '음성 인식 취소');
+      show('듣고 있어요...');
+      maxTimer = setTimeout(() => { if (active) recognition.stop(); }, 30000);
+    };
+    recognition.onresult = (event) => {
+      let combined = '';
+      for (let i = 0; i < event.results.length; i++) {
+        combined += event.results[i][0].transcript + ' ';
+      }
+      transcript = combined.trim();
+      if (transcript) {
+        show('말이 끝나면 자동 전송');
+        scheduleEnd();
+      }
+    };
+    recognition.onerror = (event) => {
+      finished = true;
+      resetTimers();
+      const messages = {
+        'not-allowed': '마이크 권한이 차단되었습니다. 주소창에서 마이크를 허용해 주세요.',
+        'audio-capture': '마이크 장치를 찾을 수 없습니다.',
+        'network': '브라우저 음성 인식 서비스에 연결할 수 없습니다.',
+        'no-speech': '목소리를 인식하지 못했습니다. 다시 시도해 주세요.',
+        'service-not-allowed': '브라우저 음성 인식 서비스 사용이 차단되었습니다.'
+      };
+      if (!manualCancel && event.error !== 'aborted') {
+        setTriggerValue('error', messages[event.error] || ('음성 인식 오류: ' + event.error));
+      }
+    };
+    recognition.onend = () => {
+      active = false;
+      resetTimers();
+      btn.classList.remove('listening');
+      btn.textContent = '🎙️';
+      btn.setAttribute('aria-label', '음성 질문 시작');
+      if (!finished && !manualCancel && transcript) {
+        finished = true;
+        show('질문 전송 중...');
+        setTriggerValue('transcript', transcript);
+      } else {
+        show(manualCancel ? '취소됨' : '마이크를 눌러 다시 질문하세요');
+      }
+    };
+    try { recognition.start(); }
+    catch (err) { show('마이크 시작 실패'); setTriggerValue('error', '마이크를 시작할 수 없습니다: ' + err.message); }
+  };
+  return () => { resetTimers(); if (recognition && active) recognition.abort(); };
+}
+"""
+able_voice_button = st.components.v2.component(
+    "able_oneclick_voice_v1", html=ABLE_VOICE_HTML,
+    css=ABLE_VOICE_CSS, js=ABLE_VOICE_JS,
+)
+
 if selected_page == PAGES[0]:
     # 홈 화면
     st.markdown("""<div class="able-home">
@@ -802,52 +915,27 @@ if selected_page == PAGES[0]:
                       on_click=navigate_to, args=(PAGES[3],))
 
     with mic_col:
-        if st.button("🎙️", key="able_voice_toggle", help="음성 질문 창 열기"):
-            st.session_state.able_voice_open = not st.session_state.get("able_voice_open", False)
+        # 브라우저 내장 음성 인식: 마이크 한 번 클릭 → 침묵 시 자동 전송
+        voice_result = able_voice_button(
+            key="able_voice_oneclick",
+            on_transcript_change=lambda: None,
+        )
     with send_col:
         st.button("➤", key="able_inline_send", help="질문 전송",
                   use_container_width=True, on_click=queue_inline_question)
 
-    # 음성 질문은 팝오버 밖에 배치하여 녹음 중 UI가 닫히지 않게 합니다.
-    if st.session_state.get("able_voice_open", False):
-        with st.container(border=True):
-            st.markdown("**🎙️ 음성으로 에이블에게 질문하기**")
-            st.caption("마이크를 눌러 녹음하고 중지한 뒤 '음성 질문 보내기'를 누르세요. 브라우저의 마이크 접근을 허용해야 합니다.")
-            recording = st.audio_input("마이크 녹음", key="able_voice_recorder", sample_rate=16000)
-            # 마이크를 사용할 수 없는 환경을 위한 대체 경로
-            fallback_audio = st.file_uploader(
-                "녹음이 안 된다면 음성 파일 업로드 (선택)",
-                type=["wav", "mp3", "m4a", "webm", "ogg"],
-                key="able_voice_audio_upload",
-            )
-            audio_source = recording if recording is not None else fallback_audio
-            if audio_source is not None:
-                st.success("음성 파일 준비 완료. 아래 버튼으로 전송하세요.")
-            if st.button("음성 질문 보내기", key="able_voice_send", type="primary", disabled=audio_source is None):
-                try:
-                    audio_bytes = audio_source.getvalue()
-                    if not audio_bytes:
-                        st.error("녹음된 음성이 비어 있습니다. 다시 녹음해주세요.")
-                    else:
-                        file_name = getattr(audio_source, "name", "question.wav") or "question.wav"
-                        with st.spinner("음성을 글자로 변환하고 있어요..."):
-                            transcript = client.audio.transcriptions.create(
-                                model="whisper-1",
-                                file=(file_name, audio_bytes),
-                                language="ko",
-                            )
-                        spoken_question = (transcript.text or "").strip()
-                        if not spoken_question:
-                            st.warning("음성을 인식하지 못했어요. 다시 녹음해주세요.")
-                        else:
-                            st.session_state.last_transcript = spoken_question
-                            st.info(f"인식된 질문: {spoken_question}")
-                            with st.spinner("에이블이 답변을 준비하고 있어요..."):
-                                handle_home_request(spoken_question, user_name)
-                            st.session_state.able_voice_open = False
-                            st.rerun()
-                except Exception as exc:
-                    st.error(f"음성 질문 처리 오류: {exc}")
+    if voice_result.transcript:
+        spoken_question = str(voice_result.transcript).strip()
+        if spoken_question:
+            st.session_state.last_transcript = spoken_question
+            try:
+                with st.spinner(f"음성 질문 처리 중: {spoken_question}"):
+                    handle_home_request(spoken_question, user_name)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"음성 질문 처리 오류: {exc}")
+    if voice_result.error:
+        st.warning(str(voice_result.error))
 
     if st.session_state.pop("able_empty_send", False):
         st.warning("질문을 입력해주세요.")
