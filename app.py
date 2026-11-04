@@ -145,6 +145,7 @@ def oauth_flow():
         settings,
         scopes=SCOPES,
         redirect_uri=redirect_uri
+        autogenerate_code_verifier=False
     )
 
 
@@ -244,8 +245,8 @@ if "code" in st.query_params:
         flow = oauth_flow()
 
         flow.fetch_token(
-            code=st.query_params["code"],
-            code_verifier=None
+            code=st.query_params["code"]
+            
         )
 
         st.session_state.google_token = json.loads(
