@@ -619,6 +619,47 @@ def handle_home_request(question, user_name):
             ask_ai(f"[현재 사용자: {user_name}]\n{question}", document)
 
 
+def generate_meeting_email_draft(document, purpose="회의 결과 공유 및 담당 업무 안내"):
+    """회의록 기반으로 제목/본문을 함께 생성합니다. 발송은 절대 수행하지 않습니다."""
+    if not document.strip():
+        raise ValueError("먼저 회의록을 첨부해주세요.")
+    instruction = (
+        "당신은 한국어 비즈니스 이메일 작성 전문가입니다. "
+        "제공된 회의록에 근거하여 자연스럽고 구체적인 업무 이메일 초안을 작성하세요. "
+        "반드시 JSON 객체만 반환하세요: "
+        '{"subject":"메일 제목","body":"메일 본문"}. '
+        "제목은 [업무 요청], [회의 결과 공유], [긴급] 중 상황에 맞는 접두어를 사용하고, "
+        "핵심 주제와 요청 사항이 드러나게 작성하세요. "
+        "본문에는 담당자, 업무, 마감일을 회의록에 나온 경우에만 정확히 기재하고, "
+        "확인되지 않은 날짜·수신 이메일 주소·결정 사항은 지어내지 마세요. "
+        "회의에 불참한 담당자가 있다면 업무 전달 목적을 명확히 하세요. "
+        "발송을 승인하거나 발송했다고 말하지 마세요."
+    )
+    response = client.responses.create(
+        model="gpt-4o-mini",
+        input=[
+            {"role": "system", "content": instruction},
+            {"role": "user", "content": f"이메일 목적: {purpose}\\n\\n[회의록]\\n{document[:50000]}"},
+        ],
+        text={"format": {"type": "json_object"}},
+    )
+    draft = json.loads(response.output_text)
+    subject = str(draft.get("subject") or "").strip()
+    body = str(draft.get("body") or "").strip()
+    if not subject or not body:
+        raise ValueError("AI가 제목 또는 본문을 비워 두었습니다. 다시 시도해주세요.")
+    return subject[:180], body
+
+
+def prepare_meeting_email_draft(document, purpose="회의 결과 공유 및 담당 업무 안내"):
+    subject, body = generate_meeting_email_draft(document, purpose)
+    st.session_state.mail_subject = subject
+    st.session_state.mail_body = body
+    st.session_state.mail_draft = {"to": st.session_state.mail_to, "subject": subject, "body": body}
+    st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
+    return subject, body
+
+
 def analyze_meeting_automatically(meeting_day):
     document = st.session_state.document
     if not document.strip():
@@ -627,8 +668,13 @@ def analyze_meeting_automatically(meeting_day):
     with st.spinner('1/3 · 회의록 요약 중...'):
         summary = ask_ai('회의록을 요약하고 핵심 결정 사항과 후속 조치를 정리해줘.', document)
     st.session_state.oneclick_summary = summary
-    st.session_state.mail_subject = f'[ABLE] {st.session_state.doc_name} 회의 요약'
-    st.session_state.mail_body = summary
+    # 회의록에 맞는 제목과 본문을 별도로 AI 생성 (실제 발송 없음)
+    try:
+        prepare_meeting_email_draft(document)
+    except (ValueError, json.JSONDecodeError, Exception) as exc:
+        st.session_state.mail_subject = f'[회의 결과 공유] {st.session_state.doc_name}'
+        st.session_state.mail_body = summary
+        st.warning(f"이메일 초안 자동 생성에 실패해 회의 요약을 임시 본문으로 사용합니다: {exc}")
     with st.spinner('2/3 · 업무 추출 및 중요도 분석 중...'):
         st.session_state.tasks = extract_tasks(document, meeting_day)
     with st.spinner('3/3 · 일정 후보 추출 중...'):
@@ -674,7 +720,7 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 if selected_page == PAGES[0]:
-    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 한 줄 입력창 통합")
+    st.caption("ABLE 업데이트 확인 · 2026-11-04 · Enter 전송 및 간격 조정")
     st.markdown("""<div class="able-home">
       <div class="able-orb">✦</div>
       <h1>무엇을 도와드릴까요?</h1>
@@ -683,45 +729,53 @@ if selected_page == PAGES[0]:
     for message in st.session_state.messages[-10:]:
         with st.chat_message(message["role"]):
             st.write(message["content"])
-    # 한 줄 입력바: [+ 첨부/설정] [질문 입력] [달력] [마이크] [전송]
-    st.markdown("""<style>
-    /* 홈 입력바를 한 줄로 정렬하고 여백을 최소화 */
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
-        align-items:center; gap:.35rem;
-        border:1px solid #e1e5ec; border-radius:32px;
-        padding:.32rem .55rem; background:white;
-        box-shadow:0 2px 10px rgba(20,35,60,.035);
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
-        border:none; box-shadow:none; background:transparent;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
-        border:0; box-shadow:none; background:transparent; padding:.25rem;
-    }
-    .able-input-anchor {display:none}
-    </style>""", unsafe_allow_html=True)
-    plus_col, input_col, cal_col, mic_col, send_col = st.columns(
-        [0.75, 7.1, 0.75, 0.75, 0.75], vertical_alignment="center", gap="small"
-    )
-    with plus_col:
-        st.markdown('<span class="able-input-anchor"></span>', unsafe_allow_html=True)
-        with st.popover("＋", help="회의록 첨부 및 음성 설정"):
-            st.markdown("**첨부 및 설정**")
+    # 입력창 Enter / 전송 화살표 공통 콜백
+    def queue_inline_question():
+        pending = st.session_state.get("able_inline_question", "").strip()
+        if pending:
+            st.session_state.able_pending_question = pending
+            st.session_state.able_inline_question = ""
+        else:
+            st.session_state.able_empty_send = True
+
+    # + 버튼을 제거하고 첨부·음성설정은 사이드바로 이동
+    with st.sidebar:
+        with st.expander("📎 회의록 첨부 · 음성 설정", expanded=False):
             home_file = st.file_uploader(
                 "회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
                 on_change=queue_meeting_upload, args=("able_home_upload",),
-                help="첨부만으로 분석하지 않습니다. 메시지로 분석을 요청해야 합니다."
+                help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요."
             )
             st.toggle("🔊 AI 답변 음성 재생", value=False, key="home_tts_enabled")
             if home_file is not None:
                 st.success(f"첨부 완료: {home_file.name}")
             elif st.session_state.document:
                 st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
+
+    st.markdown("""<style>
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
+        align-items:center; gap:0.15rem;
+        border:1px solid #e1e5ec; border-radius:32px;
+        padding:.28rem .42rem; background:white;
+        box-shadow:0 2px 10px rgba(20,35,60,.035);
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
+        border:none; box-shadow:none; background:transparent;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
+        border:0; box-shadow:none; background:transparent; padding:.12rem;
+    }
+    .able-input-anchor {display:none}
+    </style>""", unsafe_allow_html=True)
+    input_col, cal_col, mic_col, send_col = st.columns(
+        [9.3, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
+    )
     with input_col:
-        question = st.text_input(
+        st.markdown('<span class="able-input-anchor"></span>', unsafe_allow_html=True)
+        st.text_input(
             "에이블에게 메시지", key="able_inline_question",
             placeholder="에이블에게 무엇이든 물어보세요...",
-            label_visibility="collapsed"
+            label_visibility="collapsed", on_change=queue_inline_question
         )
     with cal_col:
         with st.popover("📅", help="월간 미니 달력 열기"):
@@ -784,19 +838,20 @@ if selected_page == PAGES[0]:
                     except Exception as exc:
                         st.error(f"음성 질문 처리 오류: {exc}")
     with send_col:
-        send_question = st.button("➤", key="able_inline_send", help="질문 전송", use_container_width=True)
+        st.button("➤", key="able_inline_send", help="질문 전송",
+                  use_container_width=True, on_click=queue_inline_question)
 
-    if send_question:
-        if question.strip():
-            try:
-                handle_home_request(question.strip(), user_name)
-                st.rerun()
-            except Exception as exc:
-                st.error(f"AI 요청 오류: {exc}")
-        else:
-            st.warning("질문을 입력해주세요.")
+    if st.session_state.pop("able_empty_send", False):
+        st.warning("질문을 입력해주세요.")
+    pending_question = st.session_state.pop("able_pending_question", None)
+    if pending_question:
+        try:
+            handle_home_request(pending_question, user_name)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"AI 요청 오류: {exc}")
 
-    # 음성 답변 기능은 + 메뉴에서 활성화
+    # 음성 답변 기능은 사이드바에서 활성화
     if st.session_state.get("last_answer") and st.session_state.get("home_tts_enabled", False):
         last_answer = st.session_state.last_answer
         if st.session_state.get("home_tts_answer") != last_answer:
@@ -809,7 +864,7 @@ if selected_page == PAGES[0]:
         if st.session_state.get("last_audio"):
             st.audio(st.session_state.last_audio, format="audio/mp3")
 
-    st.caption("왼쪽 위 메뉴(☰)를 열면 회의록 원클릭·일정·이메일 기능을 사용할 수 있어요.")
+    st.caption("회의록 첨부와 음성 설정은 왼쪽 메뉴(☰)에서 이용할 수 있어요.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
@@ -922,10 +977,17 @@ if selected_page == PAGES[1]:
 
         st.markdown("#### ✉️ 회의 요약 이메일 발송 승인")
         st.caption("이메일은 자동으로 보내지지 않습니다. 수신인·제목·본문을 확인한 뒤 직접 승인하세요.")
+        if st.button("✨ 회의록으로 이메일 제목·본문 다시 생성", key="oneclick_regenerate_email"):
+            try:
+                with st.spinner("이메일 제목과 본문 생성 중..."):
+                    prepare_meeting_email_draft(st.session_state.document)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"이메일 초안 생성 실패: {exc}")
         with st.form("oneclick_email_form"):
             recipient = st.text_input("받는 사람", value=st.session_state.mail_to, key="oneclick_recipient")
-            subject = st.text_input("제목", value=st.session_state.mail_subject, key="oneclick_subject")
-            body = st.text_area("본문", value=st.session_state.mail_body, height=180, key="oneclick_body")
+            subject = st.text_input("제목", value=st.session_state.mail_subject, key=f"oneclick_subject_{st.session_state.get('email_draft_revision', 0)}")
+            body = st.text_area("본문", value=st.session_state.mail_body, height=180, key=f"oneclick_body_{st.session_state.get('email_draft_revision', 0)}")
             consent = st.checkbox("수신인과 내용을 확인했으며 이메일 발송에 동의합니다.")
             submit_mail = st.form_submit_button("📨 이메일 최종 승인 및 발송", type="primary")
         if submit_mail:
@@ -1210,7 +1272,7 @@ if selected_page == PAGES[3]:
 
 if selected_page == PAGES[4]:
     st.subheader("✉️ 이메일 발송")
-    st.caption("LLM이 요청 시 초안을 생성하고, 실제 발송은 사용자가 승인한 후에만 실행합니다.")
+    st.caption("회의록에서 이메일 제목과 본문을 AI로 생성하고 직접 수정할 수 있습니다. 발송은 최종 승인 후에만 진행합니다.")
 
     # 자격 정보 존재 여부만 안내 (실제 값은 노출하지 않음)
     gmail_address = config("GMAIL_ADDRESS")
@@ -1224,6 +1286,17 @@ if selected_page == PAGES[4]:
         st.caption("홈에서 '이메일로 보내줘'라고 요청하거나 아래 칸에 직접 작성할 수 있습니다.")
 
     draft = st.session_state.mail_draft or {}
+    if st.session_state.document:
+        if st.button("✨ 회의록 기반 이메일 제목·본문 AI 작성", key="email_generate_title_body"):
+            try:
+                with st.spinner("이메일 제목과 본문 작성 중..."):
+                    prepare_meeting_email_draft(st.session_state.document)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"이메일 생성 실패: {exc}")
+    else:
+        st.caption("회의록을 첨부하면 AI가 제목과 본문을 함께 작성할 수 있어요.")
+
     if st.button("최근 AI 답변을 본문에 불러오기", key="mail_use_last_answer"):
         st.session_state.mail_body = st.session_state.last_answer
     # 폼 위젯은 제출 전까지 재실행되지 않으므로, 확인 여부로 submit을 disabled 처리하면
