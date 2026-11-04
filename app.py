@@ -674,7 +674,7 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 if selected_page == PAGES[0]:
-    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 홈/AI 비서 통합본")
+    st.caption("ABLE 업데이트 확인 · 2026-11-04 · 홈/AI 비서 통합 · 음성파일 영역 제거")
     st.markdown("""<div class="able-home">
       <div class="able-orb">✦</div>
       <h1>무엇을 도와드릴까요?</h1>
@@ -709,28 +709,6 @@ if selected_page == PAGES[0]:
                 st.warning(f"음성 답변 생성 실패: {exc}")
         if st.session_state.get("last_audio"):
             st.audio(st.session_state.last_audio, format="audio/mp3")
-
-    with st.expander("음성 파일로 질문하기 (MP3 / M4A / WAV)"):
-        uploaded_voice = st.file_uploader("음성 파일 첨부", type=["mp3", "m4a", "wav"], key="home_voice_file")
-        if st.button("음성 파일 질문 보내기", key="home_voice_file_send"):
-            if uploaded_voice is None:
-                st.warning("먼저 음성 파일을 첨부해주세요.")
-            else:
-                try:
-                    with st.spinner("음성을 인식하고 있어요..."):
-                        recognized = client.audio.transcriptions.create(
-                            model="whisper-1", file=(uploaded_voice.name, uploaded_voice.getvalue())
-                        ).text.strip()
-                    if recognized:
-                        st.session_state.last_transcript = recognized
-                        handle_home_request(recognized, user_name)
-                        st.rerun()
-                    else:
-                        st.warning("음성을 인식하지 못했어요.")
-                except Exception as exc:
-                    st.error(f"음성 파일 처리 오류: {exc}")
-        if st.session_state.get("last_transcript"):
-            st.caption(f"최근 음성 인식: {st.session_state.last_transcript}")
 
     # 마이크는 녹음 후 '음성 질문 보내기'를 눌렀을 때만 실행됩니다.
     # 달력은 날짜 입력칸 대신 월간 달력을 팝오버에 바로 표시합니다.
@@ -1339,4 +1317,3 @@ if selected_page == PAGES[5]:
             st.error(f"일정 조회 실패: {exc}")
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
-        st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
