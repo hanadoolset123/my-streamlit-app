@@ -553,23 +553,68 @@ def send_email(to, subject, body):
 
 
 
+# 홈/원클릭 파일 업로드 즉시 자동 분석 예약 및 메뉴 이동
+# Streamlit 위젯의 on_change/on_click 콜백은 재실행 전에 호출되므로
+# 이미 만들어진 라디오 위젯의 상태를 사후 변경하는 오류를 피합니다.
+def navigate_to(page):
+    st.session_state.able_navigation = page
+
+
+def queue_meeting_upload(widget_key, destination=None):
+    uploaded = st.session_state.get(widget_key)
+    if uploaded is None:
+        return
+    content = extract_txt(uploaded)
+    if not content.strip():
+        st.session_state.upload_warning = '파일 내용이 비어 있습니다.'
+        return
+    digest = hashlib.sha256(content.encode('utf-8')).hexdigest()
+    if digest != st.session_state.get('analyzed_document_hash'):
+        st.session_state.document = content
+        st.session_state.doc_name = uploaded.name
+        st.session_state.tasks = []
+        st.session_state.pending_events = []
+        st.session_state.oneclick_summary = ''
+        st.session_state.mail_body = ''
+        st.session_state.analysis_queued = True
+        st.session_state.analysis_document_hash = digest
+        st.session_state.upload_warning = ''
+    if destination is not None:
+        st.session_state.able_navigation = destination
+
+
+def analyze_meeting_automatically(meeting_day):
+    document = st.session_state.document
+    if not document.strip():
+        raise ValueError('회의록 파일에 분석할 내용이 없습니다.')
+    # 요약, 업무/우선순위, 일정, 메일 초안까지 자동으로 준비
+    with st.spinner('1/3 · 회의록 요약 중...'):
+        summary = ask_ai('회의록을 요약하고 핵심 결정 사항과 후속 조치를 정리해줘.', document)
+    st.session_state.oneclick_summary = summary
+    st.session_state.mail_subject = f'[ABLE] {st.session_state.doc_name} 회의 요약'
+    st.session_state.mail_body = summary
+    with st.spinner('2/3 · 업무 추출 및 중요도 분석 중...'):
+        st.session_state.tasks = extract_tasks(document, meeting_day)
+    with st.spinner('3/3 · 일정 후보 추출 중...'):
+        st.session_state.pending_events = extract_events(document, meeting_day)
+    st.session_state.oneclick_approved = False
+    st.session_state.analyzed_document_hash = st.session_state.get('analysis_document_hash') or hashlib.sha256(document.encode('utf-8')).hexdigest()
+    st.session_state.analysis_queued = False
+
+
 # 숨김 사이드바 메뉴 + 미니멀 홈 화면
 PAGES = ["🏠 홈", "✨ 회의록 원클릭", "🎙 AI 비서", "🎯 업무 우선순위", "📅 일정 관리", "✉️ 이메일", "🔗 Google Calendar"]
-if "able_page" not in st.session_state:
-    st.session_state.able_page = PAGES[0]
+if "able_navigation" not in st.session_state:
+    st.session_state.able_navigation = PAGES[0]
 
 with st.sidebar:
     st.markdown("### ✦ ABLE")
     st.caption("AI 업무비서")
-    # 홈 버튼으로 페이지 이동한 경우에도 메뉴 상태를 동기화
-    if st.session_state.get("able_navigation") != st.session_state.able_page:
-        st.session_state.able_navigation = st.session_state.able_page
     selected_page = st.radio(
         "메뉴", PAGES,
         key="able_navigation",
         label_visibility="collapsed"
     )
-    st.session_state.able_page = selected_page
     st.divider()
     st.markdown("**개인 설정**")
     user_name = st.text_input("사용자 이름", value="김 대리")
@@ -602,24 +647,16 @@ if selected_page == PAGES[0]:
     # 홈에서도 회의록을 첨부할 수 있도록 추가
     home_file = st.file_uploader(
         "📎 회의록 첨부 (TXT)", type=["txt"], key="able_home_upload",
-        help="파일을 첨부한 뒤 질문하거나 회의록 원클릭 분석으로 이동하세요."
+        on_change=queue_meeting_upload,
+        args=("able_home_upload", PAGES[1]),
+        help="파일을 첨부하면 요약·업무·중요도·일정·메일 초안이 자동 분석됩니다."
     )
     if home_file is not None:
-        home_document = extract_txt(home_file)
-        if (st.session_state.doc_name != home_file.name
-                or st.session_state.document != home_document):
-            st.session_state.document = home_document
-            st.session_state.doc_name = home_file.name
-            st.session_state.tasks = []
-            st.session_state.pending_events = []
-            st.session_state.oneclick_summary = ""
-            st.session_state.oneclick_approved = False
-        st.caption(f"첨부 완료: {home_file.name} · {len(home_document):,}자")
-        if st.button("✨ 이 회의록 원클릭 분석하기", type="primary", use_container_width=True):
-            st.session_state.able_page = PAGES[1]
-            st.rerun()
+        st.caption(f"첨부 완료: {home_file.name}")
+        st.button("✨ 분석 결과 보기", key="home_result_open", type="primary",
+                  on_click=navigate_to, args=(PAGES[1],), use_container_width=True)
     elif st.session_state.document:
-        st.caption(f"현재 회의록: {st.session_state.doc_name or '이름 없음'}")
+        st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
 
     # 홈 메시지창 바로 위에 음성 녹음 및 미니 달력 버튼 배치
     st.markdown("""<style>
@@ -671,9 +708,8 @@ if selected_page == PAGES[0]:
             else:
                 st.caption("선택한 날짜에 등록된 내부 일정이 없어요.")
             st.caption("이 미니 달력에는 에이블 내부 일정이 표시됩니다.")
-            if st.button("전체 일정 관리 열기", key="home_open_calendar"):
-                st.session_state.able_page = PAGES[4]
-                st.rerun()
+            st.button("전체 일정 관리 열기", key="home_open_calendar",
+                      on_click=navigate_to, args=(PAGES[4],))
     with hint_col:
         st.caption("🎙️ 음성 질문  ·  📅 미니 달력")
 
@@ -691,19 +727,12 @@ if selected_page == PAGES[0]:
 if selected_page == PAGES[1]:
     st.subheader("✨ 회의록 원클릭 분석")
     st.caption("한 번에 요약·업무 추출·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
-    one_file = st.file_uploader("회의록 TXT 파일", type=["txt"], key="oneclick_txt")
+    one_file = st.file_uploader("회의록 TXT 파일", type=["txt"], key="oneclick_txt",
+                                on_change=queue_meeting_upload, args=("oneclick_txt",))
     base_day = st.date_input("회의 날짜 (상대 날짜 해석 기준)", value=date.today(), key="oneclick_meeting_day")
     if one_file is None and st.session_state.document:
         st.info(f"홈에서 첨부한 회의록이 준비되어 있습니다: {st.session_state.doc_name}")
     if one_file is not None:
-        new_document = extract_txt(one_file)
-        if (st.session_state.doc_name != one_file.name or st.session_state.document != new_document):
-            st.session_state.document = new_document
-            st.session_state.doc_name = one_file.name
-            st.session_state.tasks = []
-            st.session_state.pending_events = []
-            st.session_state.oneclick_summary = ""
-            st.session_state.oneclick_approved = False
         st.success(f"파일 준비 완료: {one_file.name}")
     if "oneclick_summary" not in st.session_state:
         st.session_state.oneclick_summary = ""
@@ -712,25 +741,21 @@ if selected_page == PAGES[1]:
     if "oneclick_google_ids" not in st.session_state:
         st.session_state.oneclick_google_ids = {}
 
-    if st.button("🚀 회의록 전체 자동 분석", type="primary", use_container_width=True, key="oneclick_run"):
+    st.caption("TXT 파일을 한 번 올리면 자동 분석됩니다. Google Calendar 등록과 메일 발송은 별도 승인합니다.")
+    if st.session_state.get("upload_warning"):
+        st.warning(st.session_state.upload_warning)
+    rerun_analysis = st.button("🔄 현재 회의록 다시 분석", key="oneclick_run")
+    if rerun_analysis or st.session_state.get("analysis_queued", False):
         if not st.session_state.document.strip():
             st.warning("먼저 회의록 TXT 파일을 업로드해주세요.")
         else:
             try:
-                with st.spinner("회의 요약 작성 중..."):
-                    summary = ask_ai("회의록을 요약하고 핵심 결정 사항과 후속 조치를 정리해줘.", st.session_state.document)
-                st.session_state.oneclick_summary = summary
-                with st.spinner("업무 및 중요도 분석 중..."):
-                    st.session_state.tasks = extract_tasks(st.session_state.document, base_day)
-                with st.spinner("일정 후보 추출 중..."):
-                    st.session_state.pending_events = extract_events(st.session_state.document, base_day)
-                st.session_state.mail_subject = f"[ABLE] {st.session_state.doc_name} 회의 요약"
-                st.session_state.mail_body = summary
-                st.session_state.oneclick_approved = False
-                st.success("요약, 업무, 중요도, 일정, 이메일 초안을 모두 준비했습니다.")
+                analyze_meeting_automatically(base_day)
+                st.success("회의 요약, 업무·중요도, 일정 후보, 이메일 초안을 자동으로 준비했어요.")
             except Exception as exc:
-                st.error(f"분석 중 오류가 발생했습니다: {exc}")
-                st.info("완료된 항목은 남아 있을 수 있습니다. 아래 결과를 확인해주세요.")
+                st.session_state.analysis_queued = False
+                st.error(f"자동 분석 오류: {exc}")
+                st.info("완료된 분석은 아래에 남아 있을 수 있습니다. '다시 분석'을 눌러 재시도하세요.")
 
     if st.session_state.oneclick_summary:
         st.markdown("#### 📝 회의 요약")
@@ -1283,4 +1308,3 @@ if selected_page == PAGES[6]:
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
         st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
-
