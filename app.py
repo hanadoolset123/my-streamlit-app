@@ -333,7 +333,7 @@ if st.session_state.pending_email is not None:
     with st.form("email_approval"):
         to = st.text_input(
             "받는 사람",
-            value=draft["to"]
+            value=draft["to"] or lgo70140@gmail.com
         )
         subject = st.text_input(
             "제목",
@@ -373,3 +373,51 @@ if st.session_state.pending_email is not None:
                 st.session_state.pending_email = None
             except Exception as e:
                 st.error(f"이메일 발송 실패: {e}")
+
+
+# ==========================================
+# 12. 요약 결과 이메일 발송 제안
+# ==========================================
+if (
+    st.session_state.show_email_question
+    and st.session_state.pending_email is None
+):
+
+    st.divider()
+
+    st.subheader("✉️ 요약 결과 이메일 발송")
+
+    st.info(
+        "김 대리님, 방금 요약한 내용을 "
+        "이메일로 보내드릴까요?"
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        send_yes = st.button(
+            "✅ 예, 이메일 보내기",
+            use_container_width=True
+        )
+
+    with col2:
+        send_no = st.button(
+            "❌ 아니요",
+            use_container_width=True
+        )
+
+    if send_yes:
+
+        st.session_state.pending_email = {
+            "to": "",
+            "subject": "회의록 요약 및 김 대리 업무 정리",
+            "body": st.session_state.last_summary
+        }
+
+        st.session_state.show_email_question = False
+        st.rerun()
+
+    if send_no:
+
+        st.session_state.show_email_question = False
+        st.rerun()
