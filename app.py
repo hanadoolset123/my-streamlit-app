@@ -934,7 +934,7 @@ if selected_page == PAGES[0]:
                 st.rerun()
             except Exception as exc:
                 st.error(f"음성 질문 처리 오류: {exc}")
-    if voice_result.error:
+    if voice_result.get("error"):
         st.warning(str(voice_result.error))
 
     if st.session_state.pop("able_empty_send", False):
