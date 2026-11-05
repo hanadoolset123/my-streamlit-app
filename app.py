@@ -426,6 +426,7 @@ def ask_ai(question, document="", raw_question=None):
             st.session_state.mail_to = recipient_display
             st.session_state.mail_subject = subject
             st.session_state.mail_body = body
+            st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
             if explicit_send_intent(raw_question):
                 try:
                     answer = send_once(recipients, subject, body, "채팅/음성 명령", str(uuid.uuid4()))
@@ -765,6 +766,8 @@ def queue_meeting_upload(widget_key, destination=None):
         st.session_state.pending_events = []
         st.session_state.oneclick_summary = ""
         st.session_state.mail_body = ""
+        st.session_state.mail_draft = None
+        st.session_state.able_last_draft = None
         st.session_state.analysis_document_hash = digest
         st.session_state.analysis_queued = False
         st.session_state.upload_warning = ""
@@ -806,7 +809,7 @@ def restore_meeting_snapshot(entry):
     st.session_state.pending_events = json.loads(json.dumps(entry.get("pending_events", [])))
     st.session_state.mail_subject = entry.get("mail_subject", "")
     st.session_state.mail_body = entry.get("mail_body", "")
-    st.session_state.mail_draft = {"to": st.session_state.get("able_default_email", ""),
+    st.session_state.mail_draft = {"to": "",
                                    "subject": st.session_state.mail_subject,
                                    "body": st.session_state.mail_body}
     st.session_state.able_last_draft = st.session_state.mail_draft
@@ -851,7 +854,7 @@ def handle_home_request(question, user_name):
         confirmation = (
             "회의록 분석과 3개 메뉴 연동을 완료했어요.\n\n"
             f"**📝 회의 요약**\n{summary}\n\n"
-            f"**✉️ 이메일:** 발송 전 확인할 초안 준비 완료\n\n"
+            f"**✉️ 이메일:** {'발송 전 확인할 초안 준비 완료' if st.session_state.get('mail_draft') else '초안 생성 확인 필요'}\n\n"
             f"**🎯 업무 우선순위:** {task_count}건 추출\n\n"
             f"**📅 일정 관리:** 등록 후보 {event_count}건 추출\n\n"
             "왼쪽 메뉴에서 각 항목을 확인할 수 있어요. 이메일 발송과 일정 등록은 승인 전에는 실행되지 않습니다."
@@ -905,7 +908,7 @@ def prepare_meeting_email_draft(document, purpose="회의 결과 공유 및 담�
     subject, body = generate_meeting_email_draft(document, purpose)
     st.session_state.mail_subject = subject
     st.session_state.mail_body = body
-    st.session_state.mail_draft = {"to": st.session_state.mail_to, "subject": subject, "body": body}
+    st.session_state.mail_draft = {"to": "", "subject": subject, "body": body}
     st.session_state.able_last_draft = st.session_state.mail_draft
     st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
     return subject, body
@@ -925,6 +928,14 @@ def analyze_meeting_automatically(meeting_day):
     except (ValueError, json.JSONDecodeError, Exception) as exc:
         st.session_state.mail_subject = f'[회의 결과 공유] {st.session_state.doc_name}'
         st.session_state.mail_body = summary
+        # AI 초안 생성 실패 시에도 이메일 탭에서 실제로 열 수 있는 초안을 만든다.
+        st.session_state.mail_draft = {
+            "to": "",
+            "subject": st.session_state.mail_subject,
+            "body": st.session_state.mail_body,
+        }
+        st.session_state.able_last_draft = st.session_state.mail_draft.copy()
+        st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
         st.warning(f"이메일 초안 자동 생성에 실패해 회의 요약을 임시 본문으로 사용합니다: {exc}")
     with st.spinner('2/3 · 업무 추출 및 중요도 분석 중...'):
         st.session_state.tasks = extract_tasks(document, meeting_day)
@@ -1133,6 +1144,41 @@ able_voice_button = st.components.v2.component(
     css=ABLE_VOICE_CSS, js=ABLE_VOICE_JS,
 )
 
+# 각 탭 제목 오른쪽의 마이크: 홈과 동일한 브라우저 음성 인식 컴포넌트를 재사용합니다.
+# 위젯이 생성된 후 메뉴 상태를 수정하지 않고, 현재 탭에서 명령을 처리합니다.
+def tab_voice_title(title, tab_id):
+    title_col, mic_col = st.columns([12, 1], vertical_alignment="center", gap="small")
+    with title_col:
+        st.subheader(title)
+    with mic_col:
+        result = able_voice_button(
+            key=f"able_tab_voice_{tab_id}",
+            on_transcript_change=lambda: None,
+        )
+    transcript = result.get("transcript") if result is not None else None
+    error = result.get("error") if result is not None else None
+    if error:
+        st.warning(str(error))
+    if transcript:
+        question = str(transcript).strip()
+        if question:
+            st.session_state.last_transcript = question
+            try:
+                st.session_state.able_reply_mode = "voice"
+                with st.spinner(f"음성 명령 처리 중: {question}"):
+                    handle_home_request(question, user_name)
+                st.session_state.able_tab_voice_feedback = f"🎙️ 인식된 명령: {question}"
+                st.rerun()
+            except Exception as exc:
+                st.error(f"음성 명령 오류: {exc}")
+    feedback = st.session_state.pop("able_tab_voice_feedback", "")
+    if feedback:
+        st.info(feedback)
+        if st.session_state.get("last_answer"):
+            with st.expander("✦ 에이블 답변", expanded=True):
+                st.write(st.session_state.last_answer)
+
+
 if selected_page == PAGES[0]:
     # 홈 화면
     st.markdown("""<div class="able-home">
@@ -1298,7 +1344,7 @@ if selected_page == PAGES[0]:
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
-    st.subheader("✨ 회의록 원클릭 분석")
+    tab_voice_title("✨ 회의록 원클릭 분석", "meeting")
     st.caption("사용자가 분석을 지시하면 요약·업무·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
     with st.expander("📚 지난 회의록", expanded=False):
         st.caption("분석 완료된 회의록을 최대 50개까지 현재 세션에 보관합니다. 새로고침이나 세션 종료 시 사라질 수 있습니다.")
@@ -1463,7 +1509,7 @@ if selected_page == PAGES[1]:
                     st.error(f"이메일 발송 실패: {exc}")
 
 if selected_page == PAGES[2]:
-    st.subheader("업무 우선순위 분석")
+    tab_voice_title("업무 우선순위 분석", "tasks")
     st.caption("회의록에서 할 일을 추출하고 중요도를 직접 조정하세요. 마감일이 없는 업무는 긴급하다고 추정하지 않습니다.")
     meeting_date=st.date_input("회의 기준일",value=date.today(),key="task_meeting_date")
     if st.button("✨ 회의록에서 업무 자동 추출",type="primary"):
@@ -1546,7 +1592,7 @@ if selected_page == PAGES[2]:
 
 
 if selected_page == PAGES[3]:
-    st.subheader("📅 확정 일정 캘린더")
+    tab_voice_title("📅 확정 일정 캘린더", "calendar")
     st.caption("회의록 일정 승인 + 업무 마감일 반영 + 충돌 탐지 / Google Calendar 별도 탭에서 동기화 가능")
 
     # 1. 회의록 후보 추출 → 검토 후 확정
@@ -1729,7 +1775,7 @@ if selected_page == PAGES[3]:
 
 
 if selected_page == PAGES[4]:
-    st.subheader("✉️ 이메일 발송")
+    tab_voice_title("✉️ 이메일 발송", "email")
     st.caption("평소에는 초안을 승인 후 발송합니다. 채팅·음성에서 명확하게 보내달라고 하면 별도 승인 없이 발송합니다.")
 
     # 자격 정보 존재 여부만 안내 (실제 값은 노출하지 않음)
@@ -1738,8 +1784,22 @@ if selected_page == PAGES[4]:
     if not (gmail_address and gmail_password):
         st.warning("GMAIL_ADDRESS, GMAIL_APP_PASSWORD를 Streamlit Secrets에 등록해야 실제 발송됩니다.")
 
+    # 홈/회의록 탭에서 준비된 초안을 실제 이메일 편집기에 연결한다.
+    # 이메일 탭의 위젯이 생성되기 전에만 상태를 갱신해야 Streamlit 예외가 나지 않는다.
+    active_draft = st.session_state.get("mail_draft") or {}
+    active_revision = st.session_state.get("email_draft_revision", 0)
+    if active_draft and st.session_state.get("email_editor_loaded_revision") != active_revision:
+        st.session_state["mail_to"] = str(active_draft.get("to") or "")
+        st.session_state["mail_subject"] = str(active_draft.get("subject") or "")
+        st.session_state["mail_body"] = str(active_draft.get("body") or "")
+        st.session_state["email_editor_loaded_revision"] = active_revision
+
     if st.session_state.mail_draft:
-        st.info("AI가 작성한 메일 초안입니다. 주소·제목·본문을 확인하고 승인해주세요.")
+        st.success("회의록 이메일 초안이 자동으로 작성되었습니다. 아래 입력창에서 바로 수정하고 승인할 수 있어요.")
+        with st.expander("📝 연동된 이메일 초안 미리보기", expanded=True):
+            st.markdown("**제목:** " + str(st.session_state.get("mail_subject", "")))
+            st.text_area("초안 본문 미리보기", value=st.session_state.get("mail_body", ""),
+                         height=160, disabled=True, key=f"able_email_draft_preview_{active_revision}")
     else:
         st.caption("홈에서 '이메일로 보내줘'라고 요청하거나 아래 칸에 직접 작성할 수 있습니다.")
 
@@ -1793,7 +1853,7 @@ if selected_page == PAGES[4]:
 # Google Calendar integration tab
 # ==========================================
 if selected_page == PAGES[5]:
-    st.subheader("🔗 Google Calendar 연결 및 동기화")
+    tab_voice_title("🔗 Google Calendar 연결 및 동기화", "google_calendar")
     st.caption("내부 캘린더의 확정 일정을 선택해서 구글 캘린더에 등록합니다. 자동 업로드하지 않습니다.")
     try:
         is_google_connected = google_creds() is not None
