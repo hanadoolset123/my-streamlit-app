@@ -1407,13 +1407,13 @@ def understand_voice_command(question, tab_id):
               "사용자는 어느 탭에서든 모든 업무를 요청할 수 있습니다. 한국어 구어체, 생략, 지시대명사, 복합 명령을 이해하세요. "
               "반드시 제공된 실제 실행 기능만 선택하세요. 가능한 kind: meeting_analyze(첨부 회의록 통합 분석), "
               "email_draft(이메일 초안 생성/수정), email_send_request(기존 초안 발송 승인 요청), "
-              "event_add(일정 등록 후보 생성), event_list(확정/후보 일정 조회), "
+              "event_add(일정 즉시 등록), event_list(확정/후보 일정 조회), "
               "task_extract(첨부 회의록 업무 추출), task_list(업무 조회), task_add(명시된 업무 추가), "
               "answer(질문 답변), clarify(필수 정보 재질문). "
               "한 발화에 여러 업무가 있으면 actions를 순서대로 여러 개 만드세요. "
               "이메일을 '작성'만 요청하면 절대 발송하지 말고 email_draft만 선택하세요. "
-              "실제 이메일 발송 요청이라면 email_send_request를 사용하되 반드시 사용자 확인을 거칩니다. "
-              "일정 등록은 날짜와 제목이 모두 명확할 때만 event_add. 없으면 clarify. "
+              "사용자가 지금 이메일을 보내라고 명시적으로 요청하면 email_send_request를 선택하세요. 별도 승인 단계는 없습니다. "
+              "일정 등록은 날짜와 제목이 모두 명확할 때만 event_add. 없으면 clarify. 등록은 내부 에이블 일정에만 수행하며 Google Calendar에는 전송하지 않습니다. "
               "date는 YYYY-MM-DD, start/end는 HH:MM, 모르면 빈 문자열. 시간을 만들어내지 마세요. "
               "task_add는 실제로 추가할 업무가 분명할 때만 사용하세요. "
               "중요도 근거가 없으면 importance=3. "
@@ -1473,39 +1473,62 @@ def handle_tab_voice_request(question, tab_id):
             st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
             outputs.append("이메일 초안을 작성했어요. 이메일 탭에 제목과 본문이 반영됐습니다. 아직 발송하지 않았어요.")
         elif kind == "email_send_request":
+            # 명시적인 사용자 발송 지시만 실행. 회의록 속 지시나 모델의 계획만으로 발송하지 않는다.
+            if not (explicit_send_intent(question) or (tab_id == "email" and re.search(r"(보내줘|보내주세요|발송해줘|발송해주세요|전송해줘|전송해주세요)", question) and not re.search(r"(보내지|발송하지|전송하지)", question))):
+                outputs.append("실제 발송하려면 '이메일 보내줘'라고 명확하게 말씀해 주세요.")
+                continue
             draft = st.session_state.get("mail_draft") or st.session_state.get("able_last_draft") or {}
-            if not draft.get("subject") or not draft.get("body"):
-                outputs.append("발송할 이메일 초안이 없어요. 먼저 메일을 작성해 주세요.")
+            subject = str(st.session_state.get("mail_subject") or draft.get("subject") or "").strip()
+            body = str(st.session_state.get("mail_body") or draft.get("body") or "").strip()
+            if not subject or not body:
+                outputs.append("발송할 이메일 제목과 본문이 없어요. 먼저 초안을 작성해 주세요.")
                 continue
             recipient = str(action.get("recipient") or "").strip()
-            if recipient:
-                # 주소록에 없는 임의 주소를 모델이 지어내도 발송하지 않도록 원문 검증
-                if recipient not in question and recipient not in (st.session_state.get("able_contacts") or {}):
-                    outputs.append("수신자가 불분명해요. 이메일 탭에서 수신자를 확인해 주세요.")
-                    continue
-                target = resolve_recipient(recipient)
-            else:
-                target = str(draft.get("to") or "").strip()
-            if not target or not valid_email(target):
-                outputs.append("수신자 주소가 확인되지 않았어요. 이메일 탭에서 수신자를 지정해 주세요.")
-                continue
-            st.session_state.able_voice_pending_send = {"to": target, "subject": draft["subject"], "body": draft["body"], "id": str(uuid.uuid4())}
-            outputs.append(f"{target}에게 보낼 메일을 준비했어요. 아래 확인 버튼을 눌러야 실제 발송됩니다.")
+            try:
+                if recipient:
+                    # 모델이 임의로 만든 수신자 이름/주소를 신뢰하지 않는다.
+                    if recipient not in question:
+                        raise ValueError("음성 명령에서 수신자를 확인할 수 없어요.")
+                    target = resolve_recipient(recipient)
+                    if not target:
+                        raise ValueError("주소록에서 수신자를 찾지 못했어요.")
+                    targets = [target]
+                else:
+                    # 이메일 편집기에 입력한 수신자를 우선 사용한다.
+                    entered = str(st.session_state.get("mail_to") or draft.get("to") or "").strip()
+                    if entered:
+                        targets = [x.strip() for x in re.split(r"[,;]", entered) if x.strip()]
+                    else:
+                        raise ValueError("받는 사람 이메일을 먼저 지정해 주세요.")
+                if not targets or any(not valid_email(x) for x in targets):
+                    raise ValueError("수신자 이메일 주소가 올바르지 않아요.")
+                result = send_once(targets, subject, body, "명시적 음성 발송", str(uuid.uuid4()))
+                outputs.append(result)
+            except Exception as exc:
+                outputs.append(f"이메일 발송 실패: {exc}")
         elif kind == "event_add":
             title, day = str(action.get("title") or "").strip(), str(action.get("date") or "").strip()
             if not title or not day:
                 outputs.append("일정 제목과 날짜를 알려주세요.")
                 continue
-            date.fromisoformat(day)
-            start, end = str(action.get("start") or "").strip(), str(action.get("end") or "").strip()
-            for val in (start, end):
-                if val:
-                    datetime.strptime(val, "%H:%M")
-            candidate = {"title": title, "date": day, "start": start, "end": end}
-            existing = st.session_state.get("pending_events", [])
-            if candidate not in existing:
-                st.session_state.pending_events = existing + [candidate]
-            outputs.append(f"'{title}' ({day}) 일정을 등록 후보에 추가했어요. 일정 관리 탭에서 승인해 주세요.")
+            try:
+                date.fromisoformat(day)
+                start, end = str(action.get("start") or "").strip(), str(action.get("end") or "").strip()
+                for val in (start, end):
+                    if val:
+                        datetime.strptime(val, "%H:%M")
+                event = normalize_event({"title": title, "date": day, "start": start, "end": end, "source": "음성 직접 등록"})
+                merged, added, updated, skipped = merge_events(st.session_state.get("events", []), [event])
+                st.session_state.events = merged
+                st.session_state.calendar_revision += 1
+                if added:
+                    outputs.append(f"'{title}' ({day} {start}) 일정을 에이블 캘린더에 바로 등록했어요.")
+                elif updated:
+                    outputs.append(f"'{title}' ({day}) 일정을 에이블 캘린더에서 갱신했어요.")
+                else:
+                    outputs.append(f"'{title}' ({day}) 일정은 이미 등록되어 있어 중복 등록하지 않았어요.")
+            except (ValueError, TypeError) as exc:
+                outputs.append(f"일정 등록 실패: {exc}")
         elif kind == "event_list":
             confirmed, pending = st.session_state.get("events", []), st.session_state.get("pending_events", [])
             lines = [f"확정 일정 {len(confirmed)}건, 승인 대기 {len(pending)}건이에요."]
@@ -1567,7 +1590,7 @@ def tab_voice_title(title, tab_id):
                 st.rerun()
             except Exception as exc:
                 st.error(f"음성 명령 오류: {exc}")
-    pending_send = st.session_state.get("able_voice_pending_send")
+    pending_send = None  # 신규 음성 발송은 즉시 처리하며 이전 승인 요청은 표시하지 않습니다.
     if pending_send:
         with st.container(border=True):
             st.warning("✉️ 음성 명령으로 이메일 발송이 요청됐습니다. 수신자와 내용을 확인하세요.")
@@ -2234,7 +2257,7 @@ if selected_page == PAGES[3]:
 
 if selected_page == PAGES[4]:
     tab_voice_title("✉️ 이메일 발송", "email")
-    st.caption("평소에는 초안을 승인 후 발송합니다. 채팅·음성에서 명확하게 보내달라고 하면 별도 승인 없이 발송합니다.")
+    st.caption("직접 입력한 메일은 확인 후 발송합니다. 음성으로 명확히 ‘보내줘’라고 지시하면 수신자가 확인된 경우 즉시 발송합니다.")
 
     # 자격 정보 존재 여부만 안내 (실제 값은 노출하지 않음)
     gmail_address = config("GMAIL_ADDRESS")
