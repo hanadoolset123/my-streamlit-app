@@ -313,8 +313,8 @@ def resolve_recipients_from_request(question, fallback=""):
             add(contacts[name])
 
     # '나랑', '나와', '나에게', '내게', '나한테'는 다른 연락처와 함께 있어도 포함합니다.
-    self_pattern = r"(?<![가-힣A-Za-z])(나(?:랑|와|하고|에게|한테|도|는|를|에게도)?|내게|내메일|내이메일|본인)(?![가-힣A-Za-z])"
-    if re.search(self_pattern, q) or re.search(r"(?:나랑|나와|나하고|나에게|나한테|내게|내메일|내이메일)", q):
+    self_pattern = r"(?<![가-힣A-Za-z])(나(?:랑|와|하고|에게|한테|도|는|를|에게도)?|내게|내메일|내이메일|본인|저에게|저한테)(?![가-힣A-Za-z])"
+    if re.search(self_pattern, q) or re.search(r"(?:나랑|나와|나하고|나에게|나한테|내게|내메일|내이메일|저에게|저한테)", q):
         add(resolve_recipient(""))
 
     # '나랑 미등록에게 보내줘'처럼 주소록에 없는 명시 수신자를 발견하면 부분 발송 금지.
@@ -1483,23 +1483,23 @@ def handle_tab_voice_request(question, tab_id):
             if not subject or not body:
                 outputs.append("발송할 이메일 제목과 본문이 없어요. 먼저 초안을 작성해 주세요.")
                 continue
-            recipient = str(action.get("recipient") or "").strip()
             try:
-                if recipient:
-                    # 모델이 임의로 만든 수신자 이름/주소를 신뢰하지 않는다.
-                    if recipient not in question:
-                        raise ValueError("음성 명령에서 수신자를 확인할 수 없어요.")
-                    target = resolve_recipient(recipient)
-                    if not target:
-                        raise ValueError("주소록에서 수신자를 찾지 못했어요.")
-                    targets = [target]
+                # 발화 원문에서 본인·주소록 별칭·직접 말한 주소를 모두 추출한다.
+                # 모델이 생성한 수신자 정보는 신뢰하지 않는다.
+                spoken_targets = resolve_recipients_from_request(question)
+                spoken_has_recipient = bool(
+                    re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", question)
+                    or re.search(r"(?:나에게|나한테|나랑|나와|내게|내이메일|내메일|본인|저에게|저한테)", question)
+                    or any(name and name in question for name in (st.session_state.get("able_contacts") or {}))
+                )
+                if spoken_has_recipient:
+                    targets = spoken_targets
                 else:
-                    # 이메일 편집기에 입력한 수신자를 우선 사용한다.
+                    # '보내줘'만 말한 경우에는 현재 편집창의 수신자를 사용한다.
                     entered = str(st.session_state.get("mail_to") or draft.get("to") or "").strip()
-                    if entered:
-                        targets = [x.strip() for x in re.split(r"[,;]", entered) if x.strip()]
-                    else:
-                        raise ValueError("받는 사람 이메일을 먼저 지정해 주세요.")
+                    targets = [x.strip() for x in re.split(r"[,;]", entered) if x.strip()]
+                    if not targets:
+                        raise ValueError("받는 사람을 알려주세요. 예: '나한테 보내줘' 또는 '김 대리에게 보내줘'")
                 if not targets or any(not valid_email(x) for x in targets):
                     raise ValueError("수신자 이메일 주소가 올바르지 않아요.")
                 result = send_once(targets, subject, body, "명시적 음성 발송", str(uuid.uuid4()))
