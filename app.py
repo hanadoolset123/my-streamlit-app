@@ -2387,10 +2387,10 @@ if selected_page == PAGES[5]:
             url, _ = flow.authorization_url(
                 access_type="offline", prompt="consent", state=oauth_state(),
                 include_granted_scopes="false")
-            # Streamlit st.link_button은 새 탭을 열기 때문에 같은 탭에서 OAuth를 진행합니다.
+            # Streamlit Markdown HTML 링크는 내부 iframe에서 렌더링될 수 있으므로 _top으로 최상위 탭을 이동합니다.
             # 인증 후 GOOGLE_REDIRECT_URI로 돌아오면 상단의 OAuth 콜백이 처리합니다.
             st.markdown(
-                '<a href="' + escape(url, quote=True) + '" target="_self" '
+                '<a href="' + escape(url, quote=True) + '" target="_top" '
                 'style="display:inline-block;padding:0.55rem 1rem;border-radius:0.55rem;'
                 'background:#2563eb;color:white;text-decoration:none;font-weight:600;">'
                 '🔗 구글 계정 연결</a>',
