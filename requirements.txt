@@ -1,6 +1,6 @@
-streamlit==1.64.0
-openai==3.16.2
-pandas
-google-api-python-client
-google-auth
-google-auth-oauthlib
+streamlit>=1.52
+openai>=1.40
+google-api-python-client>=2.140
+google-auth>=2.30
+google-auth-oauthlib>=1.2
+pandas>=2.0
