@@ -1650,16 +1650,6 @@ st.markdown("""<style>
 .able-brand {font-size:clamp(45px,6vw,76px);font-weight:800;letter-spacing:.13em;color:#fff;line-height:1.2;}
 .able-tagline {color:#e1d8ff;font-size:1.08rem;font-weight:650;}
 .able-hero-sub {margin-top:19px;color:#b9b9d7;font-size:1rem;line-height:1.8;}
-/* Shortcuts: only the home row that directly follows the hero */
-div[data-testid="stVerticalBlock"]:has(> div .able-dark-hero) > div[data-testid="stHorizontalBlock"] button {
-  min-height:80px !important;border:1px solid rgba(179,139,255,.32) !important;
-  background:linear-gradient(140deg,rgba(115,83,203,.22),rgba(33,37,84,.70)) !important;
-  border-radius:18px !important;color:#f5f1ff !important;font-weight:650;
-  box-shadow:0 10px 30px rgba(0,0,0,.14);
-}
-div[data-testid="stVerticalBlock"]:has(> div .able-dark-hero) > div[data-testid="stHorizontalBlock"] button:hover {
-  border-color:#b08aff !important;background:#332762 !important;transform:translateY(-1px);
-}
 /* Existing combined input: preserve attachment, calendar, microphone and send controls */
 div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
   border:1px solid #7551c4 !important;border-radius:25px !important;
@@ -1686,6 +1676,99 @@ div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover {backg
  .able-dark-hero{padding:16px 0 12px;}
  .able-brand{font-size:44px;}
  div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {gap:0 !important;padding:.2rem !important;}
+}
+</style>""",unsafe_allow_html=True)
+
+# ABLE 2.1: dark theme refinements (presentation-only, no business logic changes)
+st.markdown("""<style>
+/* Consistent colors for Streamlit widgets, including popovers and sidebar. */
+:root { color-scheme: dark; }
+[data-testid="stAppViewContainer"] { color:#F5F3FF !important; }
+[data-testid="stSidebar"] { background:linear-gradient(180deg,#10132E,#0C1027) !important; }
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+[data-testid="stSidebar"] label p {color:#D9D5F2 !important;}
+[data-testid="stSidebar"] [role="radiogroup"] {gap:.38rem !important;}
+[data-testid="stSidebar"] [role="radiogroup"] > label {
+    padding:.64rem .78rem !important; border-radius:12px !important;
+    border:1px solid transparent !important; transition:background .18s ease;
+}
+[data-testid="stSidebar"] [role="radiogroup"] > label:hover {background:#242047 !important;}
+[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {
+    background:linear-gradient(100deg,#46318C,#30275D) !important;
+    border-color:#765BC0 !important;
+}
+/* Hide radio circles visually, but keep the underlying input for keyboard access. */
+[data-testid="stSidebar"] [role="radiogroup"] > label [data-testid="stRadioIcon"] {display:none !important;}
+[data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child:has(input) {width:0 !important;min-width:0 !important;overflow:hidden !important;}
+[data-testid="stSidebar"] button {background:#232446 !important;color:#F5F3FF !important;border:1px solid #45436C !important;}
+[data-testid="stSidebar"] button:hover {background:#37305D !important;border-color:#9A7DFF !important;}
+[data-testid="stSidebar"] input {background:#1C203E !important;color:#F5F3FF !important;border-color:#555174 !important;}
+/* Home shortcuts: scoped to unique Streamlit widget keys; never recolor other pages. */
+.st-key-able_shortcut_mail button,
+.st-key-able_shortcut_calendar button,
+.st-key-able_shortcut_meeting button,
+.st-key-able_shortcut_tasks button {
+    min-height:96px !important; border-radius:18px !important;
+    background:linear-gradient(145deg,rgba(83,69,149,.55),rgba(31,33,70,.98)) !important;
+    border:1px solid rgba(166,139,255,.45) !important;
+    color:#F7F4FF !important; font-size:1.02rem !important;font-weight:700 !important;
+    box-shadow:0 12px 32px rgba(0,0,0,.18) !important;
+    transition:transform .16s ease,background .16s ease,border-color .16s ease;
+}
+.st-key-able_shortcut_mail button *,
+.st-key-able_shortcut_calendar button *,
+.st-key-able_shortcut_meeting button *,
+.st-key-able_shortcut_tasks button * {color:#F7F4FF !important;}
+.st-key-able_shortcut_mail button:hover,
+.st-key-able_shortcut_calendar button:hover,
+.st-key-able_shortcut_meeting button:hover,
+.st-key-able_shortcut_tasks button:hover {
+    transform:translateY(-2px);background:#3B316C !important;border-color:#C0A3FF !important;
+}
+/* Preserve the original five-part composer: attachment, text, calendar, mic, send. */
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
+    align-items:center !important;gap:.25rem !important;
+    border:1px solid #8564DB !important;border-radius:26px !important;
+    padding:.55rem .65rem !important;
+    background:linear-gradient(115deg,#202044,#26224B) !important;
+    box-shadow:0 10px 38px rgba(85,53,167,.22) !important;
+}
+.able-input-anchor {display:none !important;}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input {
+    background:#292849 !important;color:#F9F7FF !important;
+    border:1px solid #4B426F !important;border-radius:13px !important;
+    box-shadow:none !important;min-height:42px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input::placeholder {color:#BDB7D9 !important;}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
+    background:transparent !important;color:#EEE7FF !important;
+    border:0 !important;box-shadow:none !important;min-height:42px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover {background:#45376F !important;border-radius:12px !important;}
+.st-key-able_inline_send button {background:#7853DA !important;border-radius:13px !important;color:white !important;}
+.st-key-able_inline_send button:hover {background:#956EF5 !important;}
+/* Global dark inputs: contrast on all pages, without changing application behavior. */
+[data-testid="stAppViewContainer"] [data-testid="stTextArea"] textarea,
+[data-testid="stAppViewContainer"] [data-testid="stTextInput"] input {
+    background:#232443;color:#F8F6FF;border-color:#555078;
+}
+[data-testid="stAppViewContainer"] [data-testid="stTextArea"] textarea::placeholder {color:#B9B3D2;}
+[data-testid="stPopoverBody"] {background:#20203F !important;border:1px solid #65518F !important;}
+[data-testid="stPopoverBody"] button {color:#F4F0FF !important;}
+/* Original mini-calendar uses light day cells: keep text readable in dark mode. */
+[data-testid="stPopoverBody"] .cal-week {color:#25304B !important;}
+[data-testid="stPopoverBody"] .cal-day {background:#2A2C4D;border-color:#555176 !important;}
+[data-testid="stPopoverBody"] .cal-num {color:#F3F0FF !important;}
+[data-testid="stPopoverBody"] .cal-task {color:#8A4300 !important;}
+[data-testid="stPopoverBody"] .cal-meeting {color:#164B76 !important;}
+.able-dark-hero {padding-top:clamp(28px,8vh,100px) !important;padding-bottom:30px !important;}
+.able-hero-sub {color:#CBC6E8 !important;}
+@media (max-width:800px) {
+ .able-dark-hero {padding-top:22px !important;}
+ .able-brand {font-size:52px !important;}
+ .st-key-able_shortcut_mail button,.st-key-able_shortcut_calendar button,
+ .st-key-able_shortcut_meeting button,.st-key-able_shortcut_tasks button {min-height:68px !important;font-size:.88rem !important;}
+ div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {padding:.3rem !important;gap:.05rem !important;}
 }
 </style>""",unsafe_allow_html=True)
 
@@ -1752,21 +1835,6 @@ if selected_page == PAGES[0]:
         with st.expander("🔊 음성 답변 설정", expanded=False):
             st.toggle("AI 답변 음성 재생", value=False, key="home_tts_enabled")
 
-    st.markdown("""<style>
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
-        align-items:center; gap:0.15rem;
-        border:1px solid #e1e5ec; border-radius:32px;
-        padding:.28rem .42rem; background:white;
-        box-shadow:0 2px 10px rgba(20,35,60,.035);
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
-        border:none; box-shadow:none; background:transparent;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
-        border:0; box-shadow:none; background:transparent; padding:.12rem;
-    }
-    .able-input-anchor {display:none}
-    </style>""", unsafe_allow_html=True)
     attach_col, input_col, cal_col, mic_col, send_col = st.columns(
         [0.62, 8.7, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
     )
