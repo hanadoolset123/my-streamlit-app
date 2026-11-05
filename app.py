@@ -21,6 +21,7 @@ import streamlit as st
 from openai import OpenAI
 
 st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="expanded")
+st.markdown("<style>" + '\n/* ABLE UI v3: common legibility and compact calendar; functional logic unchanged */\n.stApp {font-size:16px!important;}\n.stApp p,.stApp label,.stApp li,.stApp [data-testid="stMarkdownContainer"] {line-height:1.6;}\n.stApp [data-testid="stCaptionContainer"] p {color:#c9cbe1!important;font-size:.91rem!important;}\n.stApp [data-testid="stWidgetLabel"] p,.stApp label p {color:#f6f3ff!important;font-weight:600!important;}\n.stApp [data-testid="stNotification"] p,.stApp [data-testid="stAlert"] p {color:#f7f4ff!important;}\n.stApp [data-testid="stDataFrame"],.stApp [data-testid="stDataEditor"] {color:#f6f4ff!important;}\n.stApp [data-testid="stDateInput"] input,.stApp [data-testid="stTextInput"] input,.stApp textarea {background:#34395e!important;color:#fff!important;border:1px solid #7b78a8!important;}\n.stApp button,.stApp a[data-testid="stLinkButton"] {background:#39365f!important;color:#fff!important;border:1px solid #8377b4!important;}\n.stApp button *, .stApp a[data-testid="stLinkButton"] * {color:inherit!important;}\n.stApp button:disabled,.stApp button:disabled * {color:#d0cce2!important;opacity:.85!important;}\n.stApp button:hover {background:#52467e!important;border-color:#b49df9!important;}\n/* Month grid: preserve all seven columns, reduce row height without hiding overflowed events */\n.cal-grid {display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:5px!important;width:100%!important;}\n.cal-week {background:#35365e!important;color:#f3efff!important;padding:7px 2px!important;border:1px solid #55527e!important;border-radius:8px!important;font-size:13px!important;}\n.cal-day {min-height:68px!important;height:auto!important;padding:6px!important;background:#292d4f!important;border:1px solid #545679!important;border-radius:9px!important;overflow:hidden!important;}\n.cal-num {font-size:13px!important;color:#fff!important;margin-bottom:3px!important;}\n.cal-other {opacity:.52!important;}\n.cal-today {outline:2px solid #c0a4ff!important;outline-offset:-2px!important;}\n.cal-chip {font-size:10px!important;line-height:1.3!important;padding:3px 4px!important;margin:2px 0!important;}\n.cal-task {background:#5b422f!important;color:#ffe2ad!important;border-left:3px solid #f3ad4b!important;}\n.cal-meeting {background:#284969!important;color:#d4eeff!important;border-left:3px solid #75bafa!important;}\n.cal-task-soon {background:#6a4a2e!important;color:#ffe9b8!important;border-left:3px solid #ffbc5e!important;}\n.cal-task-overdue {background:#693847!important;color:#ffdce3!important;border-left:3px solid #ff819b!important;}\n.cal-more {color:#d6d0f0!important;}\n.st-key-cal_prev button,.st-key-cal_next button {background:#4b3b7a!important;color:#fff!important;border:1px solid #a58adf!important;min-height:40px!important;}\n.st-key-cal_prev button *, .st-key-cal_next button * {color:#fff!important;}\n@media(max-width:700px){.cal-grid{gap:2px!important}.cal-day{min-height:52px!important;padding:3px!important}.cal-week{font-size:11px!important;padding:5px 0!important}.cal-chip{font-size:9px!important}}\n' + "</style>", unsafe_allow_html=True)
 st.markdown("""<style>
 :root{color-scheme:dark;--able-bg:#202647;--able-surface:#333960;--able-border:#8175ad;--able-text:#f6f3ff;--able-muted:#b7b5d0;--able-accent:#a98aff}
 .stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{
@@ -1907,6 +1908,25 @@ if selected_page == PAGES[0]:
                 st.warning(f"음성 답변 생성 오류: {exc}")
 
 
+    # 새 답변이 나타나면 최신 메시지로 자동 스크롤 (기존 입력창 유지).
+    # Streamlit의 iframe에서 상위 문서 접근이 차단되면 조용히 종료합니다.
+    if st.session_state.get("messages"):
+        import streamlit.components.v1 as components
+        components.html("""<script>
+        (function () {
+          try {
+            const doc = window.parent.document;
+            const items = doc.querySelectorAll('[data-testid="stChatMessage"]');
+            if (!items.length) return;
+            const last = items[items.length - 1];
+            const container = doc.querySelector('[data-testid="stMain"]') || doc.scrollingElement;
+            function go() { last.scrollIntoView({behavior:'smooth',block:'end'}); }
+            window.requestAnimationFrame(() => window.setTimeout(go, 180));
+          } catch (e) { /* iframe cross-origin restrictions */ }
+        })();
+        </script>""", height=0)
+
+
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
     tab_voice_title("✨ 회의록 원클릭 분석", "meeting")
@@ -2310,18 +2330,7 @@ if selected_page == PAGES[3]:
         if st.button("다음 달 ▶", key="cal_next"):
             st.session_state.calendar_cursor = (cursor.replace(day=28) + timedelta(days=5)).replace(day=1).isoformat()
             st.rerun()
-    st.markdown("""<style>
-    .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
-    .cal-week{background:#eaf0f6;color:#243449;text-align:center;font-weight:700;padding:9px;border-radius:7px}
-    .cal-day{min-height:102px;padding:8px;border:1px solid #d9e1ed;border-radius:10px;background:var(--background-color);overflow:hidden}
-    .cal-other{opacity:.38}.cal-today{outline:2px solid #2383c6}
-    .cal-num{font-size:13px;font-weight:800;margin-bottom:7px}
-    .cal-chip{padding:4px 6px;border-radius:5px;margin:4px 0;font-size:11px;line-height:1.4;word-break:break-word}
-    .cal-task{background:#fff0d7;color:#8a4300;border-left:3px solid #ed9c28}
-    .cal-meeting{background:#e1f1ff;color:#164b76;border-left:3px solid #409bdb}
-    .cal-more{font-size:10px;color:#64748b}
-    @media(max-width:650px){.cal-day{padding:4px;min-height:83px}.cal-chip{font-size:9px;padding:2px}}
-    </style>""", unsafe_allow_html=True)
+    # 월간 달력은 상단의 통합 다크 테마 CSS를 사용합니다.
     st.markdown(render_month_calendar(st.session_state.events,cursor),unsafe_allow_html=True)
     st.caption("🔵 회의/직접 등록 일정  |  🟠 업무 우선순위의 마감일 (종일)")
 
@@ -2586,6 +2595,36 @@ a[data-testid="stLinkButton"]:hover, [data-testid="stLinkButton"] a:hover {backg
 /* Date inputs and file upload readability */
 [data-testid="stDateInput"] input, [data-testid="stFileUploaderDropzone"] {background:#252746!important;color:#fff!important}
 [data-testid="stFileUploaderDropzone"] button {background:#3b315e!important;color:#fff!important}
+
+/* ABLE UI v3: common legibility and compact calendar; functional logic unchanged */
+.stApp {font-size:16px!important;}
+.stApp p,.stApp label,.stApp li,.stApp [data-testid="stMarkdownContainer"] {line-height:1.6;}
+.stApp [data-testid="stCaptionContainer"] p {color:#c9cbe1!important;font-size:.91rem!important;}
+.stApp [data-testid="stWidgetLabel"] p,.stApp label p {color:#f6f3ff!important;font-weight:600!important;}
+.stApp [data-testid="stNotification"] p,.stApp [data-testid="stAlert"] p {color:#f7f4ff!important;}
+.stApp [data-testid="stDataFrame"],.stApp [data-testid="stDataEditor"] {color:#f6f4ff!important;}
+.stApp [data-testid="stDateInput"] input,.stApp [data-testid="stTextInput"] input,.stApp textarea {background:#34395e!important;color:#fff!important;border:1px solid #7b78a8!important;}
+.stApp button,.stApp a[data-testid="stLinkButton"] {background:#39365f!important;color:#fff!important;border:1px solid #8377b4!important;}
+.stApp button *, .stApp a[data-testid="stLinkButton"] * {color:inherit!important;}
+.stApp button:disabled,.stApp button:disabled * {color:#d0cce2!important;opacity:.85!important;}
+.stApp button:hover {background:#52467e!important;border-color:#b49df9!important;}
+/* Month grid: preserve all seven columns, reduce row height without hiding overflowed events */
+.cal-grid {display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:5px!important;width:100%!important;}
+.cal-week {background:#35365e!important;color:#f3efff!important;padding:7px 2px!important;border:1px solid #55527e!important;border-radius:8px!important;font-size:13px!important;}
+.cal-day {min-height:68px!important;height:auto!important;padding:6px!important;background:#292d4f!important;border:1px solid #545679!important;border-radius:9px!important;overflow:hidden!important;}
+.cal-num {font-size:13px!important;color:#fff!important;margin-bottom:3px!important;}
+.cal-other {opacity:.52!important;}
+.cal-today {outline:2px solid #c0a4ff!important;outline-offset:-2px!important;}
+.cal-chip {font-size:10px!important;line-height:1.3!important;padding:3px 4px!important;margin:2px 0!important;}
+.cal-task {background:#5b422f!important;color:#ffe2ad!important;border-left:3px solid #f3ad4b!important;}
+.cal-meeting {background:#284969!important;color:#d4eeff!important;border-left:3px solid #75bafa!important;}
+.cal-task-soon {background:#6a4a2e!important;color:#ffe9b8!important;border-left:3px solid #ffbc5e!important;}
+.cal-task-overdue {background:#693847!important;color:#ffdce3!important;border-left:3px solid #ff819b!important;}
+.cal-more {color:#d6d0f0!important;}
+.st-key-cal_prev button,.st-key-cal_next button {background:#4b3b7a!important;color:#fff!important;border:1px solid #a58adf!important;min-height:40px!important;}
+.st-key-cal_prev button *, .st-key-cal_next button * {color:#fff!important;}
+@media(max-width:700px){.cal-grid{gap:2px!important}.cal-day{min-height:52px!important;padding:3px!important}.cal-week{font-size:11px!important;padding:5px 0!important}.cal-chip{font-size:9px!important}}
+
 /* Calendar's own month buttons */
 .stApp button[kind="secondary"],.stApp button[kind="tertiary"] {background:#2d2b51!important;color:#fff!important}
 </style>""",unsafe_allow_html=True)
