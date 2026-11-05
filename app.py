@@ -1178,6 +1178,54 @@ if "able_navigation" not in st.session_state:
 
 load_mail_settings()
 
+# ChatGPT처럼 대화별 기록을 분리합니다. 현재 브라우저 세션 안에서 보관합니다.
+st.session_state.setdefault("able_chat_threads", [])
+st.session_state.setdefault("able_current_thread_id", None)
+
+def able_thread_title(messages):
+    first = next((str(m.get("content", "")).strip() for m in messages
+                  if m.get("role") == "user" and str(m.get("content", "")).strip()), "새 대화")
+    first = re.sub(r"^\[현재 사용자:[^\]]*\]\s*", "", first).strip()
+    return first[:32] + ("…" if len(first) > 32 else "")
+
+def able_save_current_thread():
+    messages = st.session_state.get("messages", [])
+    if not messages:
+        return
+    thread_id = st.session_state.get("able_current_thread_id") or uuid.uuid4().hex
+    st.session_state.able_current_thread_id = thread_id
+    threads = st.session_state.able_chat_threads
+    snapshot = {"id": thread_id, "title": able_thread_title(messages),
+                "messages": json.loads(json.dumps(messages, ensure_ascii=False, default=str)),
+                "updated_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M")}
+    st.session_state.able_chat_threads = [snapshot] + [t for t in threads if t["id"] != thread_id]
+
+def able_open_thread(thread_id):
+    able_save_current_thread()
+    thread = next((t for t in st.session_state.able_chat_threads if t["id"] == thread_id), None)
+    if thread is None:
+        return
+    st.session_state.messages = json.loads(json.dumps(thread["messages"], ensure_ascii=False))
+    st.session_state.last_answer = next((m.get("content", "") for m in reversed(thread["messages"])
+                                          if m.get("role") == "assistant"), "")
+    st.session_state.able_current_thread_id = thread_id
+    st.session_state.able_voice_draft = ""
+    st.session_state.able_tts_visible_id = ""
+
+def able_start_new_thread():
+    able_save_current_thread()
+    st.session_state.messages = []
+    st.session_state.last_answer = ""
+    st.session_state.last_audio = None
+    st.session_state.able_current_thread_id = None
+    st.session_state.able_voice_draft = ""
+    st.session_state.able_voice_review_text = ""
+    st.session_state.able_voice_last_captured = ""
+    st.session_state.able_tts_visible_id = ""
+
+# 다른 메뉴에서 생성된 채팅도 다음 실행 시 대화 목록에 반영합니다.
+able_save_current_thread()
+
 with st.sidebar:
     st.markdown("### ✦ ABLE")
     st.caption("AI 업무비서")
@@ -1189,12 +1237,30 @@ with st.sidebar:
     st.divider()
     st.markdown("**개인 설정**")
     user_name = st.text_input("사용자 이름", value="김 대리")
+    with st.expander("💬 이전 대화", expanded=False):
+        threads = st.session_state.get("able_chat_threads", [])
+        if not threads:
+            st.caption("저장된 대화가 없습니다.")
+        else:
+            for thread in threads:
+                label = thread["title"]
+                if thread["id"] == st.session_state.get("able_current_thread_id"):
+                    label = "● " + label
+                if st.button(label, key="able_open_" + thread["id"],
+                             use_container_width=True, help=thread.get("updated_at", "")):
+                    able_open_thread(thread["id"])
+                    st.session_state.able_navigation = PAGES[0]
+                    st.rerun()
     if st.button("대화 기록 초기화", use_container_width=True):
+        # 새 대화와 다르게 저장된 대화 목록까지 삭제합니다.
+        st.session_state.able_chat_threads = []
+        st.session_state.able_current_thread_id = None
         st.session_state.messages = []
         st.session_state.last_answer = ""
         st.session_state.last_audio = None
         st.session_state.able_tts_visible_id = ""
         st.session_state.able_voice_draft = ""
+        st.session_state.able_voice_review_text = ""
         st.rerun()
     st.caption("업무 자료에 민감한 정보가 포함되지 않도록 확인하세요.")
     st.divider()
@@ -1638,11 +1704,7 @@ if selected_page == PAGES[0]:
         st.caption("에이블 AI 비서 · 무엇이든 물어보세요")
     with header_right:
         if st.button("＋ 새 대화", key="able_new_chat", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.last_answer = ""
-            st.session_state.able_voice_draft = ""
-            st.session_state.able_voice_last_captured = ""
-            st.session_state.able_tts_visible_id = ""
+            able_start_new_thread()
             st.rerun()
 
     if not has_conversation:
