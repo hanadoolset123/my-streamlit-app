@@ -164,6 +164,44 @@ st.markdown(r"""<style>
 .stApp input[type="date"] {color-scheme:dark!important;}
 </style>""",unsafe_allow_html=True)
 
+
+# ABLE v8 — uploader component contrast, loaded before all page widgets.
+st.markdown(r"""<style>
+/* All uploader surfaces, including the nested light file chip. */
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"],
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] :is(div,section,article),
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFileData"],
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFileSize"],
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] [data-baseweb] {
+ background:#303655!important;background-color:#303655!important;
+ color:#FFFFFF!important;opacity:1!important;
+}
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] {
+ border:1px solid #8980C4!important;border-radius:10px!important;
+ min-width:0!important;
+}
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] :is(p,span,small,strong,label),
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFileSize"] {
+ color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;
+ opacity:1!important;text-shadow:none!important;
+}
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] button,
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] button * {
+ background:#45456F!important;color:#FFFFFF!important;
+ -webkit-text-fill-color:#FFFFFF!important;
+}
+[data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] svg {color:#FFFFFF!important;}
+[data-testid="stFileUploaderDropzone"] {background:#2B3151!important;border:1px dashed #8E83C3!important;}
+[data-testid="stFileUploaderDropzone"] :is(p,span,small) {color:#F4F0FF!important;opacity:1!important;}
+/* Date inputs remain legible even when Streamlit supplies a light field. */
+[data-testid="stDateInput"] input {background:#E9ECF6!important;color:#17203A!important;
+ -webkit-text-fill-color:#17203A!important;}
+/* Secondary explanatory copy across all pages. */
+.stApp [data-testid="stCaptionContainer"] p {color:#D8D9EB!important;opacity:1!important;}
+</style>""",unsafe_allow_html=True)
+
 # ABLE password gate (existing app feature)
 import hmac
 from zoneinfo import ZoneInfo
@@ -1355,6 +1393,7 @@ if "able_navigation" not in st.session_state:
 load_mail_settings()
 
 with st.sidebar:
+    st.caption("ABLE UI 수정 v8 · 파일 카드 대비 개선")
     st.markdown("### ✦ ABLE")
     st.caption("AI 업무비서")
     st.caption("UI 개선 · 일정 공란 처리 v2")
@@ -2526,7 +2565,10 @@ if selected_page == PAGES[4]:
         st.success("회의록 이메일 초안이 자동으로 작성되었습니다. 아래 입력창에서 바로 수정하고 승인할 수 있어요.")
         with st.expander("📝 연동된 이메일 초안 미리보기 (읽기 전용)", expanded=True):
             st.markdown("**제목:** " + str(active_draft.get("subject") or ""))
-            st.text(str(active_draft.get("body") or ""))
+            # st.text() is plain text and can inherit an incompatible foreground color.
+            # Render the generated Markdown as formatted, readable preview instead.
+            with st.container(border=True):
+                st.markdown(str(active_draft.get("body") or "(본문 없음)"))
             st.caption("이 영역은 미리보기입니다. 수정은 아래의 '제목'·'본문' 입력창에서 해주세요.")
         if st.button("⬇️ 연동된 초안을 아래 편집창에 다시 적용", key="able_apply_draft_to_editor"):
             st.session_state["mail_to"] = str(active_draft.get("to") or "")
@@ -2820,3 +2862,66 @@ st.markdown(r"""<style>
 /* Avoid styling calendar event badges, which have their own category colors. */
 .cal-chip,.cal-chip * {opacity:1!important;}
 </style>""",unsafe_allow_html=True)
+
+
+# ABLE UI v9: email draft preview and expander/read-only text contrast.
+# Keep widget logic and Gmail approval flow unchanged.
+st.markdown(r"""<style>
+/* Expanders: header and content use a consistent dark palette. */
+.stApp [data-testid="stExpander"] > details,
+.stApp [data-testid="stExpander"] details {
+  background:#292D4D!important;
+  border:1px solid #6F699F!important;
+  border-radius:12px!important;
+}
+.stApp [data-testid="stExpander"] summary,
+.stApp [data-testid="stExpander"] summary * {
+  background:#34375D!important;
+  color:#F6F3FF!important;
+  -webkit-text-fill-color:#F6F3FF!important;
+  opacity:1!important;
+}
+.stApp [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
+.stApp [data-testid="stExpander"] [data-testid="stMarkdownContainer"] :is(p,li,ul,ol,strong,em,h1,h2,h3,h4),
+.stApp [data-testid="stExpander"] [data-testid="stText"],
+.stApp [data-testid="stExpander"] [data-testid="stText"] *,
+.stApp [data-testid="stExpander"] pre,
+.stApp [data-testid="stExpander"] pre code {
+  color:#F5F3FF!important;
+  -webkit-text-fill-color:#F5F3FF!important;
+  opacity:1!important;
+}
+/* Prevent previous CSS from making plain-text blocks nearly invisible. */
+.stApp [data-testid="stText"],
+.stApp [data-testid="stText"] *,
+.stApp [data-testid="stCode"],
+.stApp [data-testid="stCode"] * {
+  color:#F4F1FF!important;
+  opacity:1!important;
+}
+/* Editable email body: legible both while typing and when disabled. */
+.stApp [data-testid="stTextArea"] textarea,
+.stApp [data-testid="stTextInput"] input {
+  background:#303455!important;
+  color:#FFFFFF!important;
+  -webkit-text-fill-color:#FFFFFF!important;
+  caret-color:#FFFFFF!important;
+}
+.stApp [data-testid="stTextArea"] textarea::placeholder,
+.stApp [data-testid="stTextInput"] input::placeholder {
+  color:#C6C5E3!important;
+  -webkit-text-fill-color:#C6C5E3!important;
+}
+/* Explicitly protect uploaded-file chips and their filenames from white-card conflicts. */
+.stApp [data-testid="stFileUploaderFile"],
+.stApp [data-testid="stFileUploaderFile"] > div {
+  background:#34395B!important;
+  color:#F7F5FF!important;
+}
+.stApp [data-testid="stFileUploaderFile"] :is(span,small,p,div),
+.stApp [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"] {
+  color:#F7F5FF!important;
+  -webkit-text-fill-color:#F7F5FF!important;
+  opacity:1!important;
+}
+</style>""", unsafe_allow_html=True)
