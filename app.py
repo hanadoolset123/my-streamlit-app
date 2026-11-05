@@ -103,6 +103,67 @@ st.markdown("""<style>
 [data-testid="stSidebar"]{min-width:260px;max-width:340px}
 </style>""",unsafe_allow_html=True)
 
+
+# ABLE UI v7: uploader cards and explanatory text, all tabs.
+# This stylesheet is loaded before page rendering, so it also covers tabs and popovers.
+st.markdown(r"""<style>
+/* Uploaded file chips have their own light backgrounds in Streamlit; override the chip itself. */
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"],
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] > div,
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] > div > div,
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFileData"],
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"] {
+  background-color:#353B60!important; color:#F9F7FF!important;
+  border-color:#7772A9!important;
+}
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] {
+  border:1px solid #7772A9!important; border-radius:11px!important;
+  padding:4px 8px!important; min-width:0!important;
+}
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] :is(span,p,small,div),
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFileSize"] {
+  color:#F6F4FF!important; opacity:1!important; text-shadow:none!important;
+}
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileSize"],
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] small {
+  color:#D5D2E9!important;
+}
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] button {
+  background:#49456F!important; color:#FFFFFF!important; border:1px solid #8179B3!important;
+}
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] button svg {
+  color:#FFFFFF!important; fill:none!important;
+}
+.stApp [data-testid="stFileUploaderDropzone"] {
+  background:#2D3355!important; border:1px dashed #8C81BC!important;
+}
+.stApp [data-testid="stFileUploaderDropzone"] :is(span,p,small,div) {
+  color:#E9E7FA!important; opacity:1!important;
+}
+.stApp [data-testid="stFileUploaderDropzone"] button {
+  background:#514780!important; color:#FFFFFF!important; border:1px solid #A69AD8!important;
+}
+/* Descriptions, muted Markdown, labels and alert text remain legible on every page. */
+.stApp [data-testid="stCaptionContainer"] :is(p,span),
+.stApp [data-testid="stMarkdownContainer"] :is(p,li,li p,ol,ul),
+.stApp [data-testid="stWidgetLabel"] :is(p,span),
+.stApp [data-testid="stExpander"] summary :is(p,span) {
+  color:#E7E5F5!important; opacity:1!important;
+}
+.stApp [data-testid="stMarkdownContainer"] :is(h1,h2,h3,h4,strong) {
+  color:#FFFFFF!important; opacity:1!important;
+}
+.stApp [data-testid="stMarkdownContainer"] li::marker {color:#CDBAFF!important;}
+.stApp [data-testid="stAlert"] :is(p,li,span) {color:#F4F3FF!important;opacity:1!important;}
+.stApp [data-testid="stFileUploader"] {min-width:0!important;}
+.stApp [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] :is(p,span) {
+  overflow-wrap:anywhere!important; word-break:break-word!important;
+}
+/* A light native input (e.g. date picker) must use dark text if not themed by Streamlit. */
+.stApp input[type="date"] {color-scheme:dark!important;}
+</style>""",unsafe_allow_html=True)
+
 # ABLE password gate (existing app feature)
 import hmac
 from zoneinfo import ZoneInfo
