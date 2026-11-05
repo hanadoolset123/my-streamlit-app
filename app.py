@@ -1629,7 +1629,7 @@ if selected_page == PAGES[0]:
     st.markdown("""<style>
     .block-container {max-width: 950px; padding-top: 1.2rem; padding-bottom: 7rem;}
     [data-testid="stChatMessage"] {border-radius: 16px; padding: .65rem .85rem;}
-    [data-testid="stChatInput"] {max-width: 900px; margin-left: auto; margin-right: auto;}
+    [data-testid="stChatInput"] {width: 100%;}
     </style>""", unsafe_allow_html=True)
 
     header_left, header_right = st.columns([5, 1], vertical_alignment="center")
@@ -1646,22 +1646,9 @@ if selected_page == PAGES[0]:
             st.rerun()
 
     if not has_conversation:
-        st.markdown("""<style>
-        /* 첫 화면: 입력창을 화면 아래에 붙이지 않고 환영 문구 바로 아래로 올림 */
-        [data-testid="stBottom"] {
-            position: fixed !important;
-            bottom: 30vh !important;
-            left: 0 !important;
-            right: 0 !important;
-            background: transparent !important;
-        }
-        [data-testid="stBottom"] > div {background: transparent !important;}
-        @media(max-height:650px) {
-            [data-testid="stBottom"] {bottom: 13vh !important;}
-        }
-        </style>""", unsafe_allow_html=True)
-        st.markdown("""<div style="text-align:center;padding:17vh 0 0;">
-          <div style="font-size:2.2rem;font-weight:700;">무엇을 도와드릴까요?</div>
+        # 첫 화면은 문서 흐름 안에 입력창을 배치합니다. fixed CSS는 사용하지 않습니다.
+        st.markdown("""<div style="text-align:center;padding:clamp(55px,12vh,140px) 0 22px;">
+          <div style="font-size:clamp(1.7rem,3vw,2.2rem);font-weight:700;">무엇을 도와드릴까요?</div>
           <div style="opacity:.65;margin-top:.6rem;">
           대화, 회의록 요약, 이메일, 일정까지 에이블에게 요청하세요.</div>
         </div>""", unsafe_allow_html=True)
@@ -1729,7 +1716,14 @@ if selected_page == PAGES[0]:
         chat_options["accept_audio"] = True
     else:
         st.info("통합 마이크를 사용하려면 requirements.txt의 Streamlit을 최신 버전으로 업데이트하세요.")
-    submitted = st.chat_input("에이블에게 무엇이든 물어보세요...", **chat_options)
+    if has_conversation:
+        # 대화 중에는 Streamlit의 기본 하단 고정 입력창 사용.
+        submitted = st.chat_input("에이블에게 무엇이든 물어보세요...", **chat_options)
+    else:
+        # 첫 화면은 일반 컨테이너 내부에 입력창을 배치하여 겹침과 좌우 쏠림 방지.
+        left_margin, composer, right_margin = st.columns([1, 8, 1], gap="small")
+        with composer:
+            submitted = st.chat_input("에이블에게 무엇이든 물어보세요...", **chat_options)
 
     if submitted:
         question = str(getattr(submitted, "text", submitted) or "").strip()
