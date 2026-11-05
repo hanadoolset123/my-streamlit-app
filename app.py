@@ -357,7 +357,8 @@ def explicit_send_intent(question):
     # 이미 작성된 이메일 초안이 있다면 '나랑 과장에게 보내줘'도 명시적 발송 명령.
     has_draft = bool(st.session_state.get("able_last_draft") or st.session_state.get("mail_draft"))
     recipient_context = bool(re.search(r"(에게|한테|나랑|나와|내게|나에게|과장|대리|팀장|방금|아까|작성한)", q))
-    return action and (mail_context or (has_draft and recipient_context))
+    confirmation_context = bool(re.search(r"(이대로|그대로|확인했|좋아|괜찮아)", q))
+    return action and (mail_context or (has_draft and (recipient_context or confirmation_context)))
 
 
 def record_send(to, subject, body, source, send_id):
@@ -395,7 +396,8 @@ def ask_ai(question, document="", raw_question=None):
     # 기존 초안을 보내는 명령은 모델 호출 없이 수신자를 모두 확인한 뒤 즉시 발송.
     is_draft_send = bool(re.search(r"(방금|아까|작성한|초안|그메일|그이메일)", raw_question))
     is_recipient_only_send = bool(re.search(r"(에게|한테|나랑|나와|나에게|내게)", raw_question)) and not re.search(r"(작성|요약해서|정리해서|새로)", raw_question)
-    if explicit_send_intent(raw_question) and draft and (is_draft_send or is_recipient_only_send):
+    is_confirmed_send = bool(re.search(r"(이대로|그대로|초안|방금|아까|작성한|그메일|그이메일|확인했|좋아|괜찮아)", raw_question))
+    if explicit_send_intent(raw_question) and draft and is_confirmed_send:
         if draft.get("subject") and draft.get("body"):
             try:
                 targets = resolve_recipients_from_request(raw_question, fallback=draft.get("to", ""))
@@ -428,13 +430,10 @@ def ask_ai(question, document="", raw_question=None):
             st.session_state.mail_subject = subject
             st.session_state.mail_body = body
             st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
-            if explicit_send_intent(raw_question):
-                try:
-                    answer = send_once(recipients, subject, body, "채팅/음성 명령", str(uuid.uuid4()))
-                except Exception as exc:
-                    answer = f"이메일을 발송하지 못했습니다: {exc} 초안은 이메일 메뉴에 남아 있어요."
-            else:
-                answer = f"이메일 초안을 준비했어요. 수신자: {recipient_display}. 이메일 메뉴에서 확인하고 승인하면 발송할 수 있어요."
+            answer = (f"📧 이메일 초안을 작성했어요. 아직 발송하지 않았습니다.\n\n"
+                      f"**받는 사람:** {recipient_display}\n\n**제목:** {subject}\n\n"
+                      f"**본문:**\n\n{body}\n\n"
+                      "내용을 확인한 후 '이대로 보내줘'라고 말하거나 이메일 메뉴에서 발송해 주세요.")
         except (ValueError, KeyError, TypeError) as exc:
             answer = f"수신자를 확인하지 못해 이메일을 발송하지 않았습니다: {exc}"
     else:
@@ -1690,172 +1689,177 @@ def tab_voice_title(title, tab_id):
 
 
 if selected_page == PAGES[0]:
-    # 홈 입력창은 하나만 사용: Streamlit 기본 채팅 입력의 첨부/음성 도구를 통합.
-    # 첫 대화 전에는 중앙 환영 화면, 첫 질문 후에는 하단 고정 채팅 화면.
-    has_conversation = bool(st.session_state.messages)
-    st.markdown("""<style>
-    .block-container {max-width: 950px; padding-top: 1.2rem; padding-bottom: 7rem;}
-    [data-testid="stChatMessage"] {border-radius: 16px; padding: .65rem .85rem;}
-    [data-testid="stChatInput"] {width: 100%;}
-    </style>""", unsafe_allow_html=True)
-
-    header_left, header_right = st.columns([5, 1], vertical_alignment="center")
-    with header_left:
-        st.markdown("### ✦ ABLE")
-        st.caption("에이블 AI 비서 · 무엇이든 물어보세요")
-    with header_right:
-        if st.button("＋ 새 대화", key="able_new_chat", use_container_width=True):
-            able_start_new_thread()
-            st.rerun()
-
-    if not has_conversation:
-        # 첫 화면은 문서 흐름 안에 입력창을 배치합니다. fixed CSS는 사용하지 않습니다.
-        st.markdown("""<div style="text-align:center;padding:clamp(55px,12vh,140px) 0 22px;">
-          <div style="font-size:clamp(1.7rem,3vw,2.2rem);font-weight:700;">무엇을 도와드릴까요?</div>
-          <div style="opacity:.65;margin-top:.6rem;">
-          대화, 회의록 요약, 이메일, 일정까지 에이블에게 요청하세요.</div>
-        </div>""", unsafe_allow_html=True)
-
-    # 음성 인식 직후 위젯이 생성되기 전에 새 텍스트를 반영합니다.
+    # 홈 화면
+    st.markdown("""<div class="able-home">
+      <div class="able-orb">✦</div>
+      <h1>무엇을 도와드릴까요?</h1>
+      <p>당신의 AI 개인비서, ABLE</p>
+    </div>""", unsafe_allow_html=True)
+    for message in st.session_state.messages[-10:]:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
     if st.session_state.get("able_voice_pending_text") is not None:
         st.session_state.able_voice_review_text = st.session_state.pop("able_voice_pending_text")
-
-    # 음성 녹음은 전송 전에 확인/수정/삭제 가능하도록 별도 초안으로 보관.
     if st.session_state.get("able_voice_draft"):
         with st.container(border=True):
-            st.markdown("**🎙️ 인식된 음성 확인**")
-            st.text_area("인식된 문장 (수정 가능)", key="able_voice_review_text", height=90)
-            send_col, delete_col = st.columns(2)
-            with send_col:
+            st.markdown("**🎙️ 인식된 문장 확인 · 수정 가능**")
+            st.text_area("음성 인식 결과", key="able_voice_review_text", height=85)
+            vc1, vc2 = st.columns(2)
+            with vc1:
                 send_voice = st.button("➤ 질문 전송", key="able_voice_review_send", use_container_width=True)
-            with delete_col:
-                delete_voice = st.button("🗑️ 삭제 · 다시 녹음", key="able_voice_review_delete", use_container_width=True)
-            if delete_voice:
-                # 이미 렌더링된 text_area의 session_state 키는 같은 실행에서 수정할 수 없습니다.
-                # 키를 직접 바꾸지 않고 초안 표시만 닫습니다.
+            with vc2:
+                discard_voice = st.button("🗑️ 삭제 · 다시 녹음", key="able_voice_review_delete", use_container_width=True)
+            if discard_voice:
                 st.session_state.able_voice_draft = ""
                 st.session_state.able_voice_pending_text = ""
-                st.session_state.able_chat_input_generation = st.session_state.get("able_chat_input_generation", 0) + 1
+                st.session_state.able_voice_generation = st.session_state.get("able_voice_generation", 0) + 1
                 st.rerun()
             if send_voice:
-                voice_question = st.session_state.get("able_voice_review_text", "").strip()
-                if voice_question:
+                spoken_question = st.session_state.get("able_voice_review_text", "").strip()
+                if spoken_question:
                     st.session_state.able_voice_draft = ""
-                    st.session_state.last_transcript = voice_question
-                    try:
-                        handle_home_request(voice_question, user_name)
-                        st.rerun()
-                    except Exception as exc:
-                        st.session_state.able_voice_draft = voice_question
-                        st.error(f"음성 질문 처리 오류: {exc}")
+                    st.session_state.last_transcript = spoken_question
+                    handle_home_request(spoken_question, user_name)
+                    st.rerun()
                 else:
                     st.warning("전송할 문장을 입력해 주세요.")
 
-    for idx, message in enumerate(st.session_state.messages):
-        role = message.get("role", "assistant")
-        content = str(message.get("content", ""))
-        with st.chat_message(role):
-            st.markdown(content)
-            if role == "assistant" and content.strip():
-                audio_key = hashlib.sha256(content.encode("utf-8")).hexdigest()
-                cache = st.session_state.setdefault("able_audio_cache", {})
-                if st.button("🔊 답변 듣기", key=f"able_chat_tts_{idx}"):
-                    try:
-                        if audio_key not in cache:
-                            with st.spinner("음성 생성 중..."):
-                                cache[audio_key] = make_speech(content)
-                        st.session_state.able_tts_visible_id = f"{idx}:{audio_key}"
-                    except Exception as exc:
-                        st.warning(f"음성 생성 오류: {exc}")
-                if st.session_state.get("able_tts_visible_id") == f"{idx}:{audio_key}" and audio_key in cache:
-                    st.audio(cache[audio_key], format="audio/mp3", autoplay=False)
-                    if st.button("⏹️ 닫기", key=f"able_chat_tts_close_{idx}"):
-                        st.session_state.able_tts_visible_id = ""
-                        st.rerun()
+    # 입력창 Enter / 전송 화살표 공통 콜백
+    def queue_inline_question():
+        pending = st.session_state.get("able_inline_question", "").strip()
+        if pending:
+            st.session_state.able_pending_question = pending
+            st.session_state.able_inline_question = ""
+        else:
+            st.session_state.able_empty_send = True
 
-    # 하나의 컴포저: 파일 첨부 + 마이크 녹음 + 텍스트 전송.
-    # accept_audio 기능을 지원하는 최신 Streamlit이 필요합니다.
-    import inspect
-    chat_params = inspect.signature(st.chat_input).parameters
-    chat_options = {
-        "key": f"able_chat_home_input_{st.session_state.get('able_chat_input_generation', 0)}",
-        "accept_file": True,
-        "file_type": ["txt"],
+    # 음성 답변 설정은 사이드바에 유지하고 파일 첨부는 입력창 왼쪽으로 이동
+    with st.sidebar:
+        with st.expander("🔊 음성 답변 설정", expanded=False):
+            st.toggle("AI 답변 음성 재생", value=False, key="home_tts_enabled")
+
+    st.markdown("""<style>
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
+        align-items:center; gap:0.15rem;
+        border:1px solid #e1e5ec; border-radius:32px;
+        padding:.28rem .42rem; background:white;
+        box-shadow:0 2px 10px rgba(20,35,60,.035);
     }
-    if "accept_audio" in chat_params:
-        chat_options["accept_audio"] = True
-    else:
-        st.info("통합 마이크를 사용하려면 requirements.txt의 Streamlit을 최신 버전으로 업데이트하세요.")
-    if has_conversation:
-        # 대화 중에는 Streamlit의 기본 하단 고정 입력창 사용.
-        submitted = st.chat_input("에이블에게 무엇이든 물어보세요...", **chat_options)
-    else:
-        # 첫 화면은 일반 컨테이너 내부에 입력창을 배치하여 겹침과 좌우 쏠림 방지.
-        left_margin, composer, right_margin = st.columns([1, 8, 1], gap="small")
-        with composer:
-            submitted = st.chat_input("에이블에게 무엇이든 물어보세요...", **chat_options)
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
+        border:none; box-shadow:none; background:transparent;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
+        border:0; box-shadow:none; background:transparent; padding:.12rem;
+    }
+    .able-input-anchor {display:none}
+    </style>""", unsafe_allow_html=True)
+    attach_col, input_col, cal_col, mic_col, send_col = st.columns(
+        [0.62, 8.7, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
+    )
+    with attach_col:
+        st.markdown('<span class="able-input-anchor"></span>', unsafe_allow_html=True)
+        with st.popover("📎", help="회의록 파일 첨부"):
+            st.markdown("**회의록 파일 첨부**")
+            home_file = st.file_uploader(
+                "TXT 회의록 선택", type=["txt"], key="able_home_upload",
+                on_change=queue_meeting_upload, args=("able_home_upload",),
+                help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요."
+            )
+            if home_file is not None:
+                st.success(f"첨부 완료: {home_file.name}")
+            elif st.session_state.document:
+                st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
+    with input_col:
+        st.text_input(
+            "에이블에게 메시지", key="able_inline_question",
+            placeholder="에이블에게 무엇이든 물어보세요...",
+            label_visibility="collapsed", on_change=queue_inline_question
+        )
+    with cal_col:
+        with st.popover("📅", help="월간 미니 달력 열기"):
+            if "home_calendar_cursor" not in st.session_state:
+                st.session_state.home_calendar_cursor = date.today().replace(day=1).isoformat()
+            cursor = date.fromisoformat(st.session_state.home_calendar_cursor)
+            prev_col, month_col, next_col = st.columns([1, 3, 1], vertical_alignment="center")
+            with prev_col:
+                if st.button("◀", key="home_mini_prev"):
+                    st.session_state.home_calendar_cursor = (
+                        cursor - timedelta(days=1)
+                    ).replace(day=1).isoformat()
+                    st.rerun()
+            with month_col:
+                st.markdown(f"**{cursor.year}년 {cursor.month}월**")
+            with next_col:
+                if st.button("▶", key="home_mini_next"):
+                    st.session_state.home_calendar_cursor = (
+                        cursor.replace(day=28) + timedelta(days=5)
+                    ).replace(day=1).isoformat()
+                    st.rerun()
+            st.markdown("""<style>
+            div[data-testid="stPopoverBody"] {min-width:360px;}
+            .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#eef2f7;border-radius:5px}
+            .cal-day{min-height:42px;padding:4px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
+            .cal-other{opacity:.3}.cal-today{outline:2px solid #4a86bd}
+            .cal-num{font-size:11px;font-weight:700;margin-bottom:3px}
+            .cal-chip{font-size:9px;line-height:1.2;padding:2px;margin:2px 0;border-radius:3px;overflow-wrap:anywhere}
+            .cal-task{background:#fff0d7;color:#8a4300}
+            .cal-meeting{background:#e1f1ff;color:#164b76}
+            .cal-more{font-size:9px}
+            </style>""", unsafe_allow_html=True)
+            st.markdown(render_month_calendar(st.session_state.events, cursor), unsafe_allow_html=True)
+            st.button("전체 일정 관리 열기", key="home_open_calendar",
+                      on_click=navigate_to, args=(PAGES[3],))
 
-    # Streamlit의 채팅 입력 위젯은 재실행 시 첨부 UI가 비워질 수 있으므로
-    # 수신한 파일은 별도 세션 저장소에 보관해 음성 재녹음과 독립적으로 유지합니다.
-    if "able_pending_attachments" not in st.session_state:
-        st.session_state.able_pending_attachments = {}
-    if st.session_state.able_pending_attachments:
-        saved_names = list(st.session_state.able_pending_attachments)
-        st.caption("📎 보관된 첨부파일: " + ", ".join(saved_names))
-        if st.button("첨부파일만 제거", key="able_clear_pending_attachments"):
-            st.session_state.able_pending_attachments = {}
+    with mic_col:
+        with st.popover("🎙️", help="마이크로 음성 질문하기"):
+            st.markdown("**음성으로 에이블에게 질문하기**")
+            st.caption("녹음 → 인식 → 문장 확인 → 전송")
+            recording = st.audio_input("마이크 녹음", key=f"home_voice_recording_{st.session_state.get('able_voice_generation', 0)}")
+            if st.button("음성 인식하기", key="home_voice_recognize", use_container_width=True):
+                if recording is None:
+                    st.warning("먼저 음성을 녹음해 주세요.")
+                else:
+                    try:
+                        with st.spinner("한국어 음성을 인식하고 있어요..."):
+                            result = client.audio.transcriptions.create(
+                                model="gpt-4o-transcribe",
+                                file=("home_recording.wav", recording.getvalue(), "audio/wav"),
+                                language="ko",
+                                prompt="한국어 업무비서 대화. 회의록, 이메일, 일정, 담당자, 업무 우선순위.",
+                            )
+                        spoken = str(result.text or "").strip()
+                        if spoken:
+                            st.session_state.able_voice_draft = spoken
+                            st.session_state.able_voice_pending_text = spoken
+                            st.rerun()
+                        else:
+                            st.warning("음성을 인식하지 못했어요. 다시 녹음해 주세요.")
+                    except Exception as exc:
+                        st.error(f"음성 인식 오류: {exc}")
+    with send_col:
+        st.button("➤", key="able_inline_send", help="질문 전송",
+                  use_container_width=True, on_click=queue_inline_question)
+
+    if st.session_state.pop("able_empty_send", False):
+        st.warning("질문을 입력해주세요.")
+    pending_question = st.session_state.pop("able_pending_question", None)
+    if pending_question:
+        try:
+            handle_home_request(pending_question, user_name)
             st.rerun()
+        except Exception as exc:
+            st.error(f"AI 요청 오류: {exc}")
 
-    if submitted:
-        question = str(getattr(submitted, "text", submitted) or "").strip()
-        attachments = getattr(submitted, "files", []) or []
-        audio_file = getattr(submitted, "audio", None)
-
-        for uploaded in attachments:
-            if str(uploaded.name).lower().endswith(".txt"):
-                content = extract_txt(uploaded)
-                st.session_state.able_pending_attachments[uploaded.name] = content
-                if content.strip():
-                    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
-                    if digest != st.session_state.get("analysis_document_hash"):
-                        st.session_state.document = content
-                        st.session_state.doc_name = uploaded.name
-                        st.session_state.analysis_document_hash = digest
-                        st.session_state.tasks = []
-                        st.session_state.pending_events = []
-                        st.session_state.oneclick_summary = ""
-                        st.session_state.mail_draft = None
-                        st.session_state.able_last_draft = None
-                    st.toast(f"📎 회의록 첨부: {uploaded.name}")
-
-        if audio_file is not None:
+    # 답변 음성은 사용자가 요청했을 때만 재생합니다.
+    if st.session_state.get("last_answer"):
+        if st.button("🔊 마지막 답변 듣기", key="able_home_listen"):
             try:
-                audio_bytes = audio_file.getvalue()
-                if audio_bytes:
-                    with st.spinner("음성을 텍스트로 변환 중..."):
-                        transcript = client.audio.transcriptions.create(
-                            model="gpt-4o-transcribe",
-                            file=("voice.wav", audio_bytes, "audio/wav"),
-                            language="ko",
-                            prompt="한국어 업무비서 대화입니다. 회의록, 일정, 이메일, 담당자, 업무 우선순위 등의 용어를 정확히 인식하세요.",
-                        )
-                    spoken = str(transcript.text or "").strip()
-                    if spoken:
-                        st.session_state.able_voice_draft = spoken
-                        st.session_state.able_voice_pending_text = spoken
-                        st.rerun()
-                    else:
-                        st.warning("인식된 음성이 없습니다. 다시 녹음해 주세요.")
+                st.session_state.able_home_audio = make_speech(st.session_state.last_answer)
             except Exception as exc:
-                st.error(f"음성 인식 오류: {exc}")
-        elif question:
-            try:
-                handle_home_request(question, user_name)
-                st.rerun()
-            except Exception as exc:
-                st.error(f"AI 요청 오류: {exc}")
-        elif attachments:
-            st.info("첨부파일을 보관했어요. 음성을 다시 녹음해도 보관된 파일은 유지됩니다.")
+                st.error(f"음성 생성 오류: {exc}")
+        if st.session_state.get("able_home_audio"):
+            st.audio(st.session_state.able_home_audio, format="audio/mp3", autoplay=False)
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
