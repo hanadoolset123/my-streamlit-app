@@ -1623,192 +1623,123 @@ def tab_voice_title(title, tab_id):
 
 
 if selected_page == PAGES[0]:
-    # 홈 화면
-    st.markdown("""<div class="able-home">
-      <div class="able-orb">✦</div>
-      <h1>무엇을 도와드릴까요?</h1>
-      <p>당신의 AI 개인비서, ABLE</p>
-    </div>""", unsafe_allow_html=True)
-    for message in st.session_state.messages[-10:]:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-    # 입력창 Enter / 전송 화살표 공통 콜백
-    def queue_inline_question():
-        pending = st.session_state.get("able_inline_question", "").strip()
-        if pending:
-            st.session_state.able_pending_question = pending
-            st.session_state.able_inline_question = ""
-        else:
-            st.session_state.able_empty_send = True
-
-    # 음성 질문은 자동 읽기, 텍스트 질문은 사용자에게 선택권 제공
-
+    # ChatGPT-style home. st.chat_input stays pinned at the bottom of the main page.
     st.markdown("""<style>
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
-        align-items:center; gap:0.15rem;
-        border:1px solid #e1e5ec; border-radius:32px;
-        padding:.28rem .42rem; background:white;
-        box-shadow:0 2px 10px rgba(20,35,60,.035);
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
-        border:none; box-shadow:none; background:transparent;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
-        border:0; box-shadow:none; background:transparent; padding:.12rem;
-    }
-    .able-input-anchor {display:none}
+    .block-container {max-width: 950px; padding-top: 1.1rem; padding-bottom: 7rem;}
+    [data-testid="stChatMessage"] {border-radius: 16px; padding: .65rem .85rem;}
+    [data-testid="stChatInput"] {max-width: 950px; margin-left: auto; margin-right: auto;}
     </style>""", unsafe_allow_html=True)
-    attach_col, input_col, cal_col, mic_col, send_col = st.columns(
-        [0.62, 8.7, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
-    )
+    top_left, top_right = st.columns([5, 1], vertical_alignment="center")
+    with top_left:
+        st.markdown("### ✦ ABLE")
+        st.caption("에이블 AI 비서 · 무엇이든 물어보세요")
+    with top_right:
+        if st.button("＋ 새 대화", key="able_new_chat", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.last_answer = ""
+            st.session_state.able_voice_draft = ""
+            st.session_state.able_tts_visible_id = ""
+            st.rerun()
+
+    # Attachments and microphone are kept near the conversation; text input is pinned below.
+    attach_col, mic_col, info_col = st.columns([1, 1, 8], vertical_alignment="center")
     with attach_col:
-        st.markdown('<span class="able-input-anchor"></span>', unsafe_allow_html=True)
-        with st.popover("📎", help="회의록 파일 첨부"):
-            st.markdown("**회의록 파일 첨부**")
+        with st.popover("📎 첨부", help="회의록 TXT 파일 첨부"):
             home_file = st.file_uploader(
                 "TXT 회의록 선택", type=["txt"], key="able_home_upload",
                 on_change=queue_meeting_upload, args=("able_home_upload",),
-                help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요."
+                help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요.",
             )
             if home_file is not None:
                 st.success(f"첨부 완료: {home_file.name}")
-            elif st.session_state.document:
-                st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
-    with input_col:
-        st.text_input(
-            "에이블에게 메시지", key="able_inline_question",
-            placeholder="에이블에게 무엇이든 물어보세요...",
-            label_visibility="collapsed", on_change=queue_inline_question
-        )
-    with cal_col:
-        with st.popover("📅", help="월간 미니 달력 열기"):
-            if "home_calendar_cursor" not in st.session_state:
-                st.session_state.home_calendar_cursor = date.today().replace(day=1).isoformat()
-            cursor = date.fromisoformat(st.session_state.home_calendar_cursor)
-            prev_col, month_col, next_col = st.columns([1, 3, 1], vertical_alignment="center")
-            with prev_col:
-                if st.button("◀", key="home_mini_prev"):
-                    st.session_state.home_calendar_cursor = (
-                        cursor - timedelta(days=1)
-                    ).replace(day=1).isoformat()
-                    st.rerun()
-            with month_col:
-                st.markdown(f"**{cursor.year}년 {cursor.month}월**")
-            with next_col:
-                if st.button("▶", key="home_mini_next"):
-                    st.session_state.home_calendar_cursor = (
-                        cursor.replace(day=28) + timedelta(days=5)
-                    ).replace(day=1).isoformat()
-                    st.rerun()
-            st.markdown("""<style>
-            div[data-testid="stPopoverBody"] {min-width:360px;}
-            .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
-            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#eef2f7;border-radius:5px}
-            .cal-day{min-height:42px;padding:4px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
-            .cal-other{opacity:.3}.cal-today{outline:2px solid #4a86bd}
-            .cal-num{font-size:11px;font-weight:700;margin-bottom:3px}
-            .cal-chip{font-size:9px;line-height:1.2;padding:2px;margin:2px 0;border-radius:3px;overflow-wrap:anywhere}
-            .cal-task{background:#fff0d7;color:#8a4300}
-            .cal-meeting{background:#e1f1ff;color:#164b76}
-            .cal-more{font-size:9px}
-            </style>""", unsafe_allow_html=True)
-            st.markdown(render_month_calendar(st.session_state.events, cursor), unsafe_allow_html=True)
-            st.button("전체 일정 관리 열기", key="home_open_calendar",
-                      on_click=navigate_to, args=(PAGES[3],))
-
     with mic_col:
-        # 브라우저 내장 음성 인식: 마이크 클릭 → 인식 결과 검토 후 전송
-        voice_result = able_voice_button(
-            key="able_voice_oneclick",
-            on_transcript_change=lambda: None,
-        )
-    with send_col:
-        st.button("➤", key="able_inline_send", help="질문 전송",
-                  use_container_width=True, on_click=queue_inline_question)
+        voice_result = able_voice_button(key="able_voice_oneclick", on_transcript_change=lambda: None)
+    with info_col:
+        if st.session_state.get("document"):
+            st.caption("📄 첨부된 회의록: " + (st.session_state.get("doc_name") or "이름 없음"))
+        else:
+            st.caption("마이크로 질문하거나 아래 입력창에 입력하세요")
 
-    # Streamlit component trigger fields may be absent until the user interacts.
-    # Access optional fields defensively to avoid AttributeError/KeyError.
     voice_transcript = voice_result.get("transcript") if voice_result is not None else None
     voice_error = voice_result.get("error") if voice_result is not None else None
-
+    if voice_error:
+        st.warning(str(voice_error))
     if voice_transcript:
-        spoken_question = str(voice_transcript).strip()
-        if spoken_question:
-            # 인식 결과는 바로 AI에 전송하지 않고 사용자가 수정/삭제할 수 있도록 보관합니다.
-            st.session_state.last_transcript = spoken_question
-            st.session_state.able_voice_draft = spoken_question
+        spoken = str(voice_transcript).strip()
+        # Do not submit immediately: allow correction/deletion first.
+        if spoken and spoken != st.session_state.get("able_voice_last_captured", ""):
+            st.session_state.able_voice_last_captured = spoken
+            st.session_state.able_voice_draft = spoken
+            st.session_state.able_voice_review_text = spoken
             st.rerun()
 
     if st.session_state.get("able_voice_draft"):
-        st.caption("🎙️ 음성 인식 결과를 확인한 뒤 전송하세요. 잘못 인식된 문장은 수정하거나 삭제할 수 있습니다.")
-        with st.form("able_voice_review_form", clear_on_submit=False):
-            revised_voice = st.text_area(
-                "인식된 음성 (수정 가능)",
-                value=st.session_state.able_voice_draft,
-                height=90,
-            )
+        with st.container(border=True):
+            st.markdown("**🎙️ 음성 인식 결과 확인**")
+            st.text_area("인식된 문장 (수정 가능)", key="able_voice_review_text", height=85)
             voice_send_col, voice_delete_col = st.columns(2)
             with voice_send_col:
-                send_voice = st.form_submit_button("➤ 수정한 질문 전송", use_container_width=True)
+                send_voice = st.button("➤ 수정한 질문 전송", key="able_voice_review_send", use_container_width=True)
             with voice_delete_col:
-                delete_voice = st.form_submit_button("🗑️ 삭제하고 다시 녹음", use_container_width=True)
-        if delete_voice:
-            st.session_state.able_voice_draft = ""
-            st.session_state.last_transcript = ""
-            st.rerun()
-        if send_voice:
-            spoken_question = revised_voice.strip()
-            if not spoken_question:
-                st.warning("전송할 문장을 입력해 주세요. 또는 삭제 후 다시 녹음해 주세요.")
-            else:
+                delete_voice = st.button("🗑️ 삭제 · 다시 녹음", key="able_voice_review_delete", use_container_width=True)
+            if delete_voice:
                 st.session_state.able_voice_draft = ""
-                st.session_state.last_transcript = spoken_question
-                try:
-                    with st.spinner(f"음성 질문 처리 중: {spoken_question}"):
+                st.session_state.able_voice_review_text = ""
+                st.session_state.able_voice_last_captured = ""
+                st.rerun()
+            if send_voice:
+                pending_voice = st.session_state.get("able_voice_review_text", "").strip()
+                if pending_voice:
+                    st.session_state.able_voice_draft = ""
+                    st.session_state.last_transcript = pending_voice
+                    try:
                         st.session_state.able_reply_mode = "voice"
-                        handle_home_request(spoken_question, user_name)
-                    st.rerun()
-                except Exception as exc:
-                    st.session_state.able_voice_draft = spoken_question
-                    st.error(f"음성 질문 처리 오류: {exc}")
+                        handle_home_request(pending_voice, user_name)
+                        st.rerun()
+                    except Exception as exc:
+                        st.session_state.able_voice_draft = pending_voice
+                        st.error(f"음성 질문 처리 오류: {exc}")
+                else:
+                    st.warning("전송할 문장을 입력해 주세요.")
 
-    if voice_error:
-        st.warning(str(voice_error))
+    if not st.session_state.messages:
+        st.markdown("""<div style="text-align:center;padding:4rem 0 2rem;">
+        <div style="font-size:2.2rem;font-weight:700;">무엇을 도와드릴까요?</div>
+        <div style="opacity:.65;margin-top:.6rem;">대화, 회의록 요약, 이메일, 일정까지 에이블에게 요청하세요.</div>
+        </div>""", unsafe_allow_html=True)
 
-    if st.session_state.pop("able_empty_send", False):
-        st.warning("질문을 입력해주세요.")
-    pending_question = st.session_state.pop("able_pending_question", None)
-    if pending_question:
+    # Show all available conversation history in chat bubbles. Audio is opt-in per answer.
+    for idx, message in enumerate(st.session_state.messages):
+        role = message.get("role", "assistant")
+        content = str(message.get("content", ""))
+        with st.chat_message(role):
+            st.markdown(content)
+            if role == "assistant" and content.strip():
+                audio_key = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                cache = st.session_state.setdefault("able_audio_cache", {})
+                if st.button("🔊 답변 듣기", key=f"able_chat_tts_{idx}", help="자동 재생하지 않습니다"):
+                    try:
+                        if audio_key not in cache:
+                            with st.spinner("음성 생성 중..."):
+                                cache[audio_key] = make_speech(content)
+                        st.session_state.able_tts_visible_id = f"{idx}:{audio_key}"
+                    except Exception as exc:
+                        st.warning(f"음성 생성 오류: {exc}")
+                if st.session_state.get("able_tts_visible_id") == f"{idx}:{audio_key}" and audio_key in cache:
+                    st.audio(cache[audio_key], format="audio/mp3", autoplay=False)
+                    if st.button("⏹️ 플레이어 닫기", key=f"able_chat_tts_close_{idx}"):
+                        st.session_state.able_tts_visible_id = ""
+                        st.rerun()
+
+    # Outside columns/containers, Streamlit pins chat_input to the viewport bottom.
+    question = st.chat_input("에이블에게 무엇이든 물어보세요...", key="able_chat_home_input")
+    if question and question.strip():
+        st.session_state.able_reply_mode = "text"
         try:
-            st.session_state.able_reply_mode = "text"
-            handle_home_request(pending_question, user_name)
+            handle_home_request(question.strip(), user_name)
             st.rerun()
         except Exception as exc:
             st.error(f"AI 요청 오류: {exc}")
-
-    # 답변 음성은 사용자 클릭으로만 생성/재생합니다. 화면 재실행/탭 이동 시 자동재생 금지.
-    last_answer = st.session_state.get("last_answer", "")
-    if last_answer:
-        answer_id = st.session_state.get("able_audio_answer_id", "")
-        st.caption("🔊 음성 답변은 자동 재생되지 않습니다. 원할 때만 아래 버튼을 눌러 들으세요.")
-        if st.button("🔊 AI 답변 음성 듣기", key="able_tts_play_" + str(answer_id)):
-            try:
-                if st.session_state.get("able_tts_audio_id") != answer_id:
-                    with st.spinner("음성 답변 생성 중..."):
-                        st.session_state.last_audio = make_speech(last_answer)
-                        st.session_state.able_tts_audio_id = answer_id
-                st.session_state.able_tts_visible_id = answer_id
-            except Exception as exc:
-                st.warning(f"음성 답변 생성 오류: {exc}")
-        if (st.session_state.get("able_tts_visible_id") == answer_id
-                and st.session_state.get("able_tts_audio_id") == answer_id
-                and st.session_state.get("last_audio")):
-            # Streamlit 기본 오디오 컨트롤에서 재생·일시정지·탐색을 지원합니다.
-            st.audio(st.session_state.last_audio, format="audio/mp3", autoplay=False)
-            if st.button("⏹️ 음성 플레이어 닫기", key="able_tts_hide_" + str(answer_id)):
-                st.session_state.able_tts_visible_id = ""
-                st.rerun()
-
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
