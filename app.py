@@ -817,28 +817,53 @@ def restore_meeting_snapshot(entry):
     st.session_state.pop("oneclick_event_editor", None)
 
 
+def is_meeting_analysis_request(question):
+    """홈의 자연어 회의록 요약/정리 명령을 통합 분석으로 연결."""
+    normalized = re.sub(r"\s+", "", question).lower()
+    meeting_context = any(token in normalized for token in (
+        "회의록", "회의내용", "회의자료", "회의메모", "미팅록", "미팅내용", "회의", "첨부파일", "첨부한파일"
+    ))
+    analysis_action = any(token in normalized for token in (
+        "요약", "정리", "분석", "핵심", "업무추출", "일정추출", "자동연동", "연동해", "처리해"
+    ))
+    explicit_full = any(token in normalized for token in (
+        "전체분석", "자동분석", "원클릭분석", "모두분석", "한번에분석", "업무와일정"
+    ))
+    # '요약해줘'만 입력했더라도 회의록 파일이 첨부되어 있으면 통합 분석한다.
+    attached_summary = normalized in ("요약", "요약해", "요약해줘", "정리", "정리해줘", "분석", "분석해줘")
+    return explicit_full or (meeting_context and analysis_action) or attached_summary
+
+
 def handle_home_request(question, user_name):
     question = question.strip()
     if not question:
         return
-    document = st.session_state.document
-    # 전체 분석은 명시적인 지시가 있을 때만 수행
-    full_analysis = any(word in question.replace(" ", "") for word in (
-        "전체분석", "자동분석", "원클릭분석", "모두분석", "한번에분석",
-        "업무와일정", "요약하고업무", "요약하고일정",
-        "회의록요약", "회의내용요약", "회의록정리",
-    ))
-    if full_analysis:
+    document = st.session_state.get("document", "")
+    if is_meeting_analysis_request(question):
         if not document.strip():
-            st.warning("먼저 회의록 TXT 파일을 첨부해주세요.")
+            st.warning("먼저 홈의 📎 버튼으로 회의록 TXT 파일을 첨부해주세요.")
             return
-        with st.spinner("회의록 요약·업무·중요도·일정·이메일 초안을 분석하고 있어요..."):
+        with st.spinner("회의록 요약 · 이메일 초안 · 업무 우선순위 · 일정 후보를 연동 중입니다..."):
             analyze_meeting_automatically(date.today())
+        task_count = len(st.session_state.get("tasks", []))
+        event_count = len(st.session_state.get("pending_events", []))
+        summary = st.session_state.get("oneclick_summary", "")
+        confirmation = (
+            "회의록 분석과 3개 메뉴 연동을 완료했어요.\n\n"
+            f"**📝 회의 요약**\n{summary}\n\n"
+            f"**✉️ 이메일:** 발송 전 확인할 초안 준비 완료\n\n"
+            f"**🎯 업무 우선순위:** {task_count}건 추출\n\n"
+            f"**📅 일정 관리:** 등록 후보 {event_count}건 추출\n\n"
+            "왼쪽 메뉴에서 각 항목을 확인할 수 있어요. 이메일 발송과 일정 등록은 승인 전에는 실행되지 않습니다."
+        )
         st.session_state.messages = (st.session_state.messages + [
             {"role": "user", "content": question},
-            {"role": "assistant", "content": "회의록 전체 분석이 끝났습니다. 회의록 원클릭 메뉴에서 요약, 업무 TOP 3, 일정 후보와 이메일 초안을 확인하세요. 실제 등록·발송은 승인 후 진행합니다."},
+            {"role": "assistant", "content": confirmation},
         ])[-10:]
-        st.session_state.able_navigation = PAGES[1]
+        st.session_state.last_answer = confirmation
+        st.session_state.able_audio_answer_id = uuid.uuid4().hex
+        # 홈에 머물러 결과를 확인할 수 있도록 한다. 다른 메뉴의 데이터는 session_state로 공유된다.
+        st.session_state.able_navigation = PAGES[0]
     else:
         with st.spinner("에이블이 답변을 준비하고 있어요..."):
             ask_ai(f"[현재 사용자: {user_name}]\n{question}", document, raw_question=question)
