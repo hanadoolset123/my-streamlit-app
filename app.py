@@ -20,14 +20,14 @@ import pandas as pd
 import streamlit as st
 from openai import OpenAI
 
-st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""<style>
-:root{color-scheme:dark;--able-bg:#0b0e24;--able-surface:#1c2040;--able-border:#49466d;--able-text:#f6f3ff;--able-muted:#b7b5d0;--able-accent:#a98aff}
+:root{color-scheme:dark;--able-bg:#202647;--able-surface:#333960;--able-border:#8175ad;--able-text:#f6f3ff;--able-muted:#b7b5d0;--able-accent:#a98aff}
 .stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{
- background:radial-gradient(ellipse 62% 48% at 78% 18%,rgba(101,54,184,.17),transparent 78%),#0b0e24!important;color:var(--able-text)!important}
-[data-testid="stHeader"]{background:rgba(11,14,36,.94)!important}
+ background:radial-gradient(ellipse 62% 48% at 78% 18%,rgba(147,105,230,.29),transparent 78%),#202647!important;color:var(--able-text)!important}
+[data-testid="stHeader"]{background:rgba(32,38,71,.94)!important}
 [data-testid="stMainBlockContainer"],.block-container{max-width:1150px!important;padding:2rem 2rem 5rem!important;box-sizing:border-box!important}
-[data-testid="stSidebar"]{background:#11152e!important;border-right:1px solid #302e4d!important;overflow-x:hidden!important}
+[data-testid="stSidebar"]{background:#252b50!important;border-right:1px solid #302e4d!important;overflow-x:hidden!important}
 [data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding-left:1rem!important;padding-right:1rem!important;box-sizing:border-box!important;overflow-x:hidden!important}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{min-width:0!important}
 [data-testid="stSidebar"] [role="radiogroup"]{gap:.2rem!important}
@@ -42,18 +42,18 @@ st.markdown("""<style>
 /* Uniform buttons, including secondary, navigation and OAuth link buttons */
 [data-testid="stAppViewContainer"] button,[data-testid="stSidebar"] button,
 [data-testid="stAppViewContainer"] a[data-testid="stLinkButton"]{
- background:#262747!important;color:#f7f4ff!important;border:1px solid #5a527f!important;border-radius:11px!important;box-shadow:none!important}
+ background:#3b426b!important;color:#f7f4ff!important;border:1px solid #5a527f!important;border-radius:11px!important;box-shadow:none!important}
 [data-testid="stAppViewContainer"] button *,[data-testid="stSidebar"] button *{color:inherit!important}
 [data-testid="stAppViewContainer"] button:hover,[data-testid="stSidebar"] button:hover{background:#3a3164!important;border-color:#a88aff!important}
 [data-testid="stAppViewContainer"] button[kind="primary"], [data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"]{background:#7351ce!important;color:white!important;border-color:#8e70ea!important}
 [data-testid="stAppViewContainer"] input,[data-testid="stAppViewContainer"] textarea,
 [data-testid="stAppViewContainer"] [data-baseweb="select"]>div,
-[data-testid="stSidebar"] input{background:#232642!important;color:#faf8ff!important;border-color:#595579!important;caret-color:#fff!important}
+[data-testid="stSidebar"] input{background:#3a4066!important;color:#faf8ff!important;border-color:#595579!important;caret-color:#fff!important}
 [data-testid="stAppViewContainer"] input::placeholder,[data-testid="stAppViewContainer"] textarea::placeholder{color:#bcb6d2!important;opacity:1!important}
 [data-testid="stFileUploader"]{background:#1b203d!important;border-radius:13px!important}
 [data-testid="stFileUploaderDropzone"]{background:#202541!important;border:1px dashed #71659d!important;border-radius:12px!important}
 [data-testid="stFileUploaderDropzone"] *{color:#eee9ff!important}
-[data-testid="stPopoverBody"]{background:#1c203d!important;border:1px solid #65588d!important;color:#f6f2ff!important;max-width:calc(100vw - 24px)!important;box-sizing:border-box!important}
+[data-testid="stPopoverBody"]{background:#292c50!important;border:1px solid #65588d!important;color:#f6f2ff!important;max-width:calc(100vw - 24px)!important;box-sizing:border-box!important}
 [data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"]{min-width:0!important}
 /* Restore calendar readable colors, keep all seven columns within their container */
 .cal-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
@@ -76,10 +76,10 @@ st.markdown("""<style>
 .st-key-able_shortcut_mail button:hover,.st-key-able_shortcut_calendar button:hover,.st-key-able_shortcut_meeting button:hover,.st-key-able_shortcut_tasks button:hover{background:#41366f!important;transform:translateY(-1px)}
 /* Existing attachment / text / calendar / mic / send row; no widget replacement */
 [data-testid="stHorizontalBlock"]:has(.able-input-anchor){align-items:center!important;gap:.28rem!important;padding:.5rem .6rem!important;
- background:#222344!important;border:1px solid #8768ce!important;border-radius:23px!important;box-shadow:0 12px 30px rgba(73,43,139,.2)!important}
+ background:#3b3b68!important;border:1px solid #8768ce!important;border-radius:23px!important;box-shadow:0 12px 30px rgba(73,43,139,.2)!important}
 .able-input-anchor{display:none!important}
 [data-testid="stHorizontalBlock"]:has(.able-input-anchor)>[data-testid="stColumn"]{min-width:0!important}
-[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input{min-height:42px!important;border-radius:11px!important;background:#292a4c!important;border:1px solid #5a517d!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input{min-height:42px!important;border-radius:11px!important;background:#34375e!important;border:1px solid #5a517d!important}
 [data-testid="stHorizontalBlock"]:has(.able-input-anchor) button{min-height:40px!important;min-width:34px!important;padding:.25rem!important;background:transparent!important;border:0!important;color:#eee3ff!important;font-size:1.05rem!important}
 [data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover{background:#40366c!important}
 .st-key-able_inline_send button{background:#7450d2!important;color:#fff!important;border-radius:11px!important}
@@ -87,6 +87,19 @@ st.markdown("""<style>
 @media(max-width:850px){[data-testid="stMainBlockContainer"],.block-container{padding:1rem .7rem 4rem!important}.able-dark-hero{padding:24px 4px 20px!important}
  [data-testid="stHorizontalBlock"]:has(.able-input-anchor){gap:0!important;padding:.28rem!important}
  .cal-day{padding:3px!important;min-height:64px!important}.cal-chip{font-size:9px!important;padding:2px!important}}
+
+/* ABLE restored home, slightly brighter violet dark theme */
+.able-home{display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(30px,7vh,82px) 0 24px!important}
+.able-home .able-orb{font-size:47px;color:#c8a6ff;text-shadow:0 0 30px rgba(174,118,255,.5);margin-bottom:6px}
+.able-home h1{font-size:clamp(36px,4vw,56px)!important;font-weight:800!important;letter-spacing:-.035em;margin:0!important;color:#fff!important}
+.able-home p{color:#c5c5e5!important;margin:10px 0 0!important;font-size:1.03rem!important}
+.able-shortcut-intro{text-align:center;color:#c8c5e4;font-size:.98rem;margin:2px 0 18px}
+.st-key-able_shortcut_mail button,.st-key-able_shortcut_calendar button,.st-key-able_shortcut_meeting button,.st-key-able_shortcut_tasks button{background:linear-gradient(140deg,#393663,#2d3158)!important;border-color:#8070b2!important;min-height:88px!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor){background:#3b3b68!important;border:1px solid #9b7de0!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) input{background:#34375e!important;color:#fff!important;border:1px solid #746b9c!important}
+[data-testid="stPopoverBody"]{min-width:min(370px,calc(100vw - 24px))!important;width:min(420px,calc(100vw - 24px))!important;overflow-x:hidden!important}
+[data-testid="stPopoverBody"] .cal-grid{grid-template-columns:repeat(7,minmax(0,1fr))!important;width:100%!important}
+[data-testid="stSidebar"]{min-width:260px;max-width:340px}
 </style>""",unsafe_allow_html=True)
 
 # ABLE password gate (existing app feature)
@@ -867,13 +880,29 @@ def conflicts(events):
 
 
 # ── 일정 관리 확장 함수: 승인 일정, 업무 마감일, CSV 복원 ──
+def clean_time(value):
+    """일정 시간의 누락값을 빈 문자열로 정규화합니다."""
+    if value is None:
+        return ""
+    try:
+        missing = pd.isna(value)
+        if isinstance(missing, (bool, int)) and missing:
+            return ""
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    if text.lower() in ("null", "none", "nan", "nat", ""):
+        return ""
+    return text
+
+
 def normalize_event(raw):
     event = dict(raw)
     event["id"] = str(event.get("id") or uuid.uuid4().hex)
     event["title"] = str(event.get("title") or "").strip()
     event["date"] = str(event.get("date") or "").strip()[:10]
-    event["start"] = str(event.get("start") or "").strip()
-    event["end"] = str(event.get("end") or "").strip()
+    event["start"] = clean_time(event.get("start"))
+    event["end"] = clean_time(event.get("end"))
     event["source"] = str(event.get("source") or "회의/직접 등록").strip()
     event["task_id"] = str(event.get("task_id") or "")
     if not event["title"]:
@@ -1266,6 +1295,7 @@ load_mail_settings()
 with st.sidebar:
     st.markdown("### ✦ ABLE")
     st.caption("AI 업무비서")
+    st.caption("UI 개선 · 일정 공란 처리 v2")
     selected_page = st.radio(
         "메뉴", PAGES,
         key="able_navigation",
@@ -1730,9 +1760,22 @@ if selected_page == PAGES[0]:
     # 홈 화면
     st.markdown("""<div class="able-home">
       <div class="able-orb">✦</div>
-      <h1>무엇을 도와드릴까요?</h1>
-      <p>당신의 AI 개인비서, ABLE</p>
+      <h1>ABLE</h1>
+      <p>나의 AI 개인비서 · 오늘은 무엇을 도와드릴까요?</p>
     </div>""", unsafe_allow_html=True)
+    if True:  # 바로가기 카드는 대화 중에도 항상 표시
+        st.markdown('<div class="able-shortcut-intro">이메일, 일정, 회의록, 업무 정리까지 한곳에서 시작하세요.</div>', unsafe_allow_html=True)
+        shortcut_cols = st.columns(4, gap="small")
+        shortcuts = [
+            ("✉️ 이메일 작성", PAGES[4], "able_shortcut_mail"),
+            ("📅 일정 확인", PAGES[3], "able_shortcut_calendar"),
+            ("📄 회의록 요약", PAGES[1], "able_shortcut_meeting"),
+            ("✅ 업무 정리", PAGES[2], "able_shortcut_tasks"),
+        ]
+        for col, (label, target, key) in zip(shortcut_cols, shortcuts):
+            with col:
+                st.button(label, key=key, use_container_width=True,
+                          on_click=navigate_to, args=(target,))
     for message in st.session_state.messages[-10:]:
         with st.chat_message(message["role"]):
             st.write(message["content"])
@@ -1747,21 +1790,6 @@ if selected_page == PAGES[0]:
 
     # 음성 질문은 자동 읽기, 텍스트 질문은 사용자에게 선택권 제공
 
-    st.markdown("""<style>
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
-        align-items:center; gap:0.15rem;
-        border:1px solid #e1e5ec; border-radius:32px;
-        padding:.28rem .42rem; background:white;
-        box-shadow:0 2px 10px rgba(20,35,60,.035);
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
-        border:none; box-shadow:none; background:transparent;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
-        border:0; box-shadow:none; background:transparent; padding:.12rem;
-    }
-    .able-input-anchor {display:none}
-    </style>""", unsafe_allow_html=True)
     attach_col, input_col, cal_col, mic_col, send_col = st.columns(
         [0.62, 8.7, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
     )
@@ -1804,20 +1832,6 @@ if selected_page == PAGES[0]:
                         cursor.replace(day=28) + timedelta(days=5)
                     ).replace(day=1).isoformat()
                     st.rerun()
-            st.markdown("""<style>
-            div[data-testid="stPopoverBody"] {min-width:360px;}
-            .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
-            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#eef2f7;border-radius:5px}
-            .cal-day{min-height:42px;padding:4px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
-            .cal-other{opacity:.3}.cal-today{outline:2px solid #4a86bd}
-            .cal-num{font-size:11px;font-weight:700;margin-bottom:3px}
-            .cal-chip{font-size:9px;line-height:1.2;padding:2px;margin:2px 0;border-radius:3px;overflow-wrap:anywhere}
-            .cal-task{background:#fff0d7;color:#8a4300;border-left:3px solid #ed9c28}
-            .cal-task-soon{background:#fee2e2;color:#991b1b;border-left:4px solid #dc2626;font-weight:700}
-            .cal-task-overdue{background:#f1f5f9;color:#64748b;border-left:4px solid #94a3b8}
-            .cal-meeting{background:#e1f1ff;color:#164b76}
-            .cal-more{font-size:9px}
-            </style>""", unsafe_allow_html=True)
             st.markdown(render_month_calendar(st.session_state.events, cursor), unsafe_allow_html=True)
             st.caption("🔵 회의/직접 등록 · 🟠 일반 업무 마감 · 🔴 3일 이내 마감 · ⚪ 기한 경과")
             st.button("전체 일정 관리 열기", key="home_open_calendar",
