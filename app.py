@@ -1221,6 +1221,7 @@ def able_start_new_thread():
     st.session_state.able_voice_draft = ""
     st.session_state.able_voice_review_text = ""
     st.session_state.able_voice_last_captured = ""
+    st.session_state.able_chat_input_generation = st.session_state.get("able_chat_input_generation", 0) + 1
     st.session_state.able_tts_visible_id = ""
 
 # 다른 메뉴에서 생성된 채팅도 다음 실행 시 대화 목록에 반영합니다.
@@ -1733,6 +1734,8 @@ if selected_page == PAGES[0]:
                 # 이미 렌더링된 text_area의 session_state 키는 같은 실행에서 수정할 수 없습니다.
                 # 키를 직접 바꾸지 않고 초안 표시만 닫습니다.
                 st.session_state.able_voice_draft = ""
+                st.session_state.able_voice_pending_text = ""
+                st.session_state.able_chat_input_generation = st.session_state.get("able_chat_input_generation", 0) + 1
                 st.rerun()
             if send_voice:
                 voice_question = st.session_state.get("able_voice_review_text", "").strip()
@@ -1775,7 +1778,7 @@ if selected_page == PAGES[0]:
     import inspect
     chat_params = inspect.signature(st.chat_input).parameters
     chat_options = {
-        "key": "able_chat_home_input",
+        "key": f"able_chat_home_input_{st.session_state.get('able_chat_input_generation', 0)}",
         "accept_file": True,
         "file_type": ["txt"],
     }
@@ -1792,6 +1795,17 @@ if selected_page == PAGES[0]:
         with composer:
             submitted = st.chat_input("에이블에게 무엇이든 물어보세요...", **chat_options)
 
+    # Streamlit의 채팅 입력 위젯은 재실행 시 첨부 UI가 비워질 수 있으므로
+    # 수신한 파일은 별도 세션 저장소에 보관해 음성 재녹음과 독립적으로 유지합니다.
+    if "able_pending_attachments" not in st.session_state:
+        st.session_state.able_pending_attachments = {}
+    if st.session_state.able_pending_attachments:
+        saved_names = list(st.session_state.able_pending_attachments)
+        st.caption("📎 보관된 첨부파일: " + ", ".join(saved_names))
+        if st.button("첨부파일만 제거", key="able_clear_pending_attachments"):
+            st.session_state.able_pending_attachments = {}
+            st.rerun()
+
     if submitted:
         question = str(getattr(submitted, "text", submitted) or "").strip()
         attachments = getattr(submitted, "files", []) or []
@@ -1800,6 +1814,7 @@ if selected_page == PAGES[0]:
         for uploaded in attachments:
             if str(uploaded.name).lower().endswith(".txt"):
                 content = extract_txt(uploaded)
+                st.session_state.able_pending_attachments[uploaded.name] = content
                 if content.strip():
                     digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
                     if digest != st.session_state.get("analysis_document_hash"):
@@ -1819,9 +1834,10 @@ if selected_page == PAGES[0]:
                 if audio_bytes:
                     with st.spinner("음성을 텍스트로 변환 중..."):
                         transcript = client.audio.transcriptions.create(
-                            model="whisper-1",
+                            model="gpt-4o-transcribe",
                             file=("voice.wav", audio_bytes, "audio/wav"),
                             language="ko",
+                            prompt="한국어 업무비서 대화입니다. 회의록, 일정, 이메일, 담당자, 업무 우선순위 등의 용어를 정확히 인식하세요.",
                         )
                     spoken = str(transcript.text or "").strip()
                     if spoken:
@@ -1839,7 +1855,7 @@ if selected_page == PAGES[0]:
             except Exception as exc:
                 st.error(f"AI 요청 오류: {exc}")
         elif attachments:
-            st.info("파일을 첨부했어요. 입력창에서 분석을 요청해 주세요.")
+            st.info("첨부파일을 보관했어요. 음성을 다시 녹음해도 보관된 파일은 유지됩니다.")
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
