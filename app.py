@@ -89,16 +89,6 @@ st.markdown("""<style>
  .cal-day{padding:3px!important;min-height:64px!important}.cal-chip{font-size:9px!important;padding:2px!important}}
 </style>""",unsafe_allow_html=True)
 
-if selected_page == PAGES[0]:
-    # 홈 화면
-    if not st.session_state.messages:
-        st.markdown("""<div class="able-dark-hero">
-          <div class="able-star">✦</div>
-          <div class="able-brand">ABLE</div>
-          <div class="able-tagline">나의 AI 개인비서</div>
-          <div class="able-hero-sub">이메일, 일정, 회의록, 업무 정리까지<br>지금, 에이블에게 말해보세요.</div>
-        </div>""", unsafe_allow_html=True)
-
 # ABLE password gate (existing app feature)
 import hmac
 from zoneinfo import ZoneInfo
