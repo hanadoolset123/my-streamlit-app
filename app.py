@@ -1715,6 +1715,10 @@ if selected_page == PAGES[0]:
           대화, 회의록 요약, 이메일, 일정까지 에이블에게 요청하세요.</div>
         </div>""", unsafe_allow_html=True)
 
+    # 음성 인식 직후 위젯이 생성되기 전에 새 텍스트를 반영합니다.
+    if st.session_state.get("able_voice_pending_text") is not None:
+        st.session_state.able_voice_review_text = st.session_state.pop("able_voice_pending_text")
+
     # 음성 녹음은 전송 전에 확인/수정/삭제 가능하도록 별도 초안으로 보관.
     if st.session_state.get("able_voice_draft"):
         with st.container(border=True):
@@ -1726,8 +1730,9 @@ if selected_page == PAGES[0]:
             with delete_col:
                 delete_voice = st.button("🗑️ 삭제 · 다시 녹음", key="able_voice_review_delete", use_container_width=True)
             if delete_voice:
+                # 이미 렌더링된 text_area의 session_state 키는 같은 실행에서 수정할 수 없습니다.
+                # 키를 직접 바꾸지 않고 초안 표시만 닫습니다.
                 st.session_state.able_voice_draft = ""
-                st.session_state.able_voice_review_text = ""
                 st.rerun()
             if send_voice:
                 voice_question = st.session_state.get("able_voice_review_text", "").strip()
@@ -1821,7 +1826,7 @@ if selected_page == PAGES[0]:
                     spoken = str(transcript.text or "").strip()
                     if spoken:
                         st.session_state.able_voice_draft = spoken
-                        st.session_state.able_voice_review_text = spoken
+                        st.session_state.able_voice_pending_text = spoken
                         st.rerun()
                     else:
                         st.warning("인식된 음성이 없습니다. 다시 녹음해 주세요.")
