@@ -120,6 +120,8 @@ def initialize_session_state():
         "able_audio_answer_id": "",
         "able_audio_cache": {},
         "able_last_draft": None,
+        "able_meeting_history": [],
+        "able_meeting_selected": "",
     }
 
     for key, value in defaults.items():
@@ -769,6 +771,52 @@ def queue_meeting_upload(widget_key, destination=None):
     # 업로드 시 화면을 강제로 이동하지 않습니다.
 
 
+def save_meeting_snapshot(meeting_day):
+    """Store a snapshot of a completed analysis in the current Streamlit session."""
+    document = st.session_state.get("document", "")
+    if not document.strip():
+        return
+    digest = hashlib.sha256(document.encode("utf-8")).hexdigest()
+    entry = {
+        "id": uuid.uuid4().hex,
+        "hash": digest,
+        "saved_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+        "meeting_day": str(meeting_day),
+        "name": st.session_state.get("doc_name") or "제목 없는 회의록",
+        "document": document,
+        "summary": st.session_state.get("oneclick_summary", ""),
+        "tasks": json.loads(json.dumps(st.session_state.get("tasks", []), ensure_ascii=False, default=str)),
+        "pending_events": json.loads(json.dumps(st.session_state.get("pending_events", []), ensure_ascii=False, default=str)),
+        "mail_subject": st.session_state.get("mail_subject", ""),
+        "mail_body": st.session_state.get("mail_body", ""),
+    }
+    previous = st.session_state.get("able_meeting_history", [])
+    # A reanalysis of the same uploaded document updates its entry rather than duplicating it.
+    previous = [x for x in previous if x.get("hash") != digest]
+    st.session_state.able_meeting_history = ([entry] + previous)[:50]
+    st.session_state.able_meeting_selected = entry["id"]
+
+
+def restore_meeting_snapshot(entry):
+    st.session_state.document = entry["document"]
+    st.session_state.doc_name = entry["name"]
+    st.session_state.analysis_document_hash = entry["hash"]
+    st.session_state.oneclick_summary = entry.get("summary", "")
+    st.session_state.tasks = json.loads(json.dumps(entry.get("tasks", [])))
+    st.session_state.pending_events = json.loads(json.dumps(entry.get("pending_events", [])))
+    st.session_state.mail_subject = entry.get("mail_subject", "")
+    st.session_state.mail_body = entry.get("mail_body", "")
+    st.session_state.mail_draft = {"to": st.session_state.get("able_default_email", ""),
+                                   "subject": st.session_state.mail_subject,
+                                   "body": st.session_state.mail_body}
+    st.session_state.able_last_draft = st.session_state.mail_draft
+    st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
+    st.session_state.oneclick_approved = False
+    st.session_state.able_meeting_selected = entry["id"]
+    # Invalidate the editor state when switching to a different meeting.
+    st.session_state.pop("oneclick_event_editor", None)
+
+
 def handle_home_request(question, user_name):
     question = question.strip()
     if not question:
@@ -778,6 +826,7 @@ def handle_home_request(question, user_name):
     full_analysis = any(word in question.replace(" ", "") for word in (
         "전체분석", "자동분석", "원클릭분석", "모두분석", "한번에분석",
         "업무와일정", "요약하고업무", "요약하고일정",
+        "회의록요약", "회의내용요약", "회의록정리",
     ))
     if full_analysis:
         if not document.strip():
@@ -859,6 +908,7 @@ def analyze_meeting_automatically(meeting_day):
     st.session_state.oneclick_approved = False
     st.session_state.analyzed_document_hash = st.session_state.get('analysis_document_hash') or hashlib.sha256(document.encode('utf-8')).hexdigest()
     st.session_state.analysis_queued = False
+    save_meeting_snapshot(meeting_day)
 
 
 # 숨김 사이드바 메뉴 + 미니멀 홈 화면
@@ -1225,6 +1275,34 @@ if selected_page == PAGES[0]:
 if selected_page == PAGES[1]:
     st.subheader("✨ 회의록 원클릭 분석")
     st.caption("사용자가 분석을 지시하면 요약·업무·우선순위·일정·메일 초안을 준비합니다. 등록과 발송은 별도 승인합니다.")
+    with st.expander("📚 지난 회의록", expanded=False):
+        st.caption("분석 완료된 회의록을 최대 50개까지 현재 세션에 보관합니다. 새로고침이나 세션 종료 시 사라질 수 있습니다.")
+        history = st.session_state.get("able_meeting_history", [])
+        if history:
+            search_term = st.text_input("회의록 검색", placeholder="제목 또는 내용 검색", key="able_meeting_search")
+            filtered = [entry for entry in history if search_term.strip().lower() in
+                        (entry.get("name", "") + " " + entry.get("summary", "") + " " + entry.get("document", "")).lower()]
+            if not filtered:
+                st.info("검색 결과가 없습니다.")
+            for entry in filtered:
+                with st.container(border=True):
+                    st.markdown(f"**{entry['name']}**")
+                    st.caption(f"{entry['saved_at']} · 회의일 {entry['meeting_day']} · 업무 {len(entry.get('tasks', []))}건 · 일정 {len(entry.get('pending_events', []))}건")
+                    with st.expander("저장된 분석 미리보기"):
+                        st.write(entry.get("summary", ""))
+                        st.caption("이메일 제목: " + entry.get("mail_subject", ""))
+                    open_col, delete_col = st.columns(2)
+                    with open_col:
+                        if st.button("📂 불러오기", key="meeting_open_" + entry["id"], use_container_width=True):
+                            restore_meeting_snapshot(entry)
+                            st.rerun()
+                    with delete_col:
+                        if st.button("🗑️ 삭제", key="meeting_delete_" + entry["id"], use_container_width=True):
+                            st.session_state.able_meeting_history = [x for x in history if x["id"] != entry["id"]]
+                            st.rerun()
+        else:
+            st.info("아직 저장된 회의록이 없습니다. 회의록을 분석하면 자동으로 목록에 추가됩니다.")
+    st.divider()
     one_file = st.file_uploader("회의록 TXT 파일", type=["txt"], key="oneclick_txt",
                                 on_change=queue_meeting_upload, args=("oneclick_txt",))
     base_day = st.date_input("회의 날짜 (상대 날짜 해석 기준)", value=date.today(), key="oneclick_meeting_day")
