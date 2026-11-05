@@ -119,6 +119,7 @@ def initialize_session_state():
         "able_reply_mode": "text",
         "able_audio_answer_id": "",
         "able_audio_cache": {},
+        "able_voice_draft": "",
         "able_last_draft": None,
         "able_meeting_history": [],
         "able_meeting_selected": "",
@@ -1192,6 +1193,8 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.last_answer = ""
         st.session_state.last_audio = None
+        st.session_state.able_tts_visible_id = ""
+        st.session_state.able_voice_draft = ""
         st.rerun()
     st.caption("업무 자료에 민감한 정보가 포함되지 않도록 확인하세요.")
     st.divider()
@@ -1287,7 +1290,7 @@ export default function(component) {
     clearTimeout(stopTimer);
     stopTimer = setTimeout(() => {
       if (active && recognition) recognition.stop();
-    }, 1500);
+    }, 4000);
   };
   if (!Recognition) {
     btn.title = '이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Edge를 이용하세요.';
@@ -1304,7 +1307,7 @@ export default function(component) {
     recognition = new Recognition();
     recognition.lang = 'ko-KR';
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.maxAlternatives = 1;
     transcript = '';
     finished = false;
@@ -1315,7 +1318,7 @@ export default function(component) {
       btn.textContent = '🔴';
       btn.setAttribute('aria-label', '음성 인식 취소');
       show('듣고 있어요...');
-      maxTimer = setTimeout(() => { if (active) recognition.stop(); }, 30000);
+      maxTimer = setTimeout(() => { if (active) recognition.stop(); }, 60000);
     };
     recognition.onresult = (event) => {
       let combined = '';
@@ -1324,7 +1327,7 @@ export default function(component) {
       }
       transcript = combined.trim();
       if (transcript) {
-        show('말이 끝나면 자동 전송');
+        show('말씀을 마치면 인식 결과를 확인할 수 있어요');
         scheduleEnd();
       }
     };
@@ -1350,7 +1353,7 @@ export default function(component) {
       btn.setAttribute('aria-label', '음성 질문 시작');
       if (!finished && !manualCancel && transcript) {
         finished = true;
-        show('질문 전송 중...');
+        show('인식 완료 · 아래에서 확인하세요');
         setTriggerValue('transcript', transcript);
       } else {
         show(manualCancel ? '취소됨' : '마이크를 눌러 다시 질문하세요');
@@ -1714,7 +1717,7 @@ if selected_page == PAGES[0]:
                       on_click=navigate_to, args=(PAGES[3],))
 
     with mic_col:
-        # 브라우저 내장 음성 인식: 마이크 한 번 클릭 → 침묵 시 자동 전송
+        # 브라우저 내장 음성 인식: 마이크 클릭 → 인식 결과 검토 후 전송
         voice_result = able_voice_button(
             key="able_voice_oneclick",
             on_transcript_change=lambda: None,
@@ -1731,14 +1734,44 @@ if selected_page == PAGES[0]:
     if voice_transcript:
         spoken_question = str(voice_transcript).strip()
         if spoken_question:
+            # 인식 결과는 바로 AI에 전송하지 않고 사용자가 수정/삭제할 수 있도록 보관합니다.
             st.session_state.last_transcript = spoken_question
-            try:
-                with st.spinner(f"음성 질문 처리 중: {spoken_question}"):
-                    st.session_state.able_reply_mode = "voice"
-                    handle_home_request(spoken_question, user_name)
-                st.rerun()
-            except Exception as exc:
-                st.error(f"음성 질문 처리 오류: {exc}")
+            st.session_state.able_voice_draft = spoken_question
+            st.rerun()
+
+    if st.session_state.get("able_voice_draft"):
+        st.caption("🎙️ 음성 인식 결과를 확인한 뒤 전송하세요. 잘못 인식된 문장은 수정하거나 삭제할 수 있습니다.")
+        with st.form("able_voice_review_form", clear_on_submit=False):
+            revised_voice = st.text_area(
+                "인식된 음성 (수정 가능)",
+                value=st.session_state.able_voice_draft,
+                height=90,
+            )
+            voice_send_col, voice_delete_col = st.columns(2)
+            with voice_send_col:
+                send_voice = st.form_submit_button("➤ 수정한 질문 전송", use_container_width=True)
+            with voice_delete_col:
+                delete_voice = st.form_submit_button("🗑️ 삭제하고 다시 녹음", use_container_width=True)
+        if delete_voice:
+            st.session_state.able_voice_draft = ""
+            st.session_state.last_transcript = ""
+            st.rerun()
+        if send_voice:
+            spoken_question = revised_voice.strip()
+            if not spoken_question:
+                st.warning("전송할 문장을 입력해 주세요. 또는 삭제 후 다시 녹음해 주세요.")
+            else:
+                st.session_state.able_voice_draft = ""
+                st.session_state.last_transcript = spoken_question
+                try:
+                    with st.spinner(f"음성 질문 처리 중: {spoken_question}"):
+                        st.session_state.able_reply_mode = "voice"
+                        handle_home_request(spoken_question, user_name)
+                    st.rerun()
+                except Exception as exc:
+                    st.session_state.able_voice_draft = spoken_question
+                    st.error(f"음성 질문 처리 오류: {exc}")
+
     if voice_error:
         st.warning(str(voice_error))
 
@@ -1753,33 +1786,28 @@ if selected_page == PAGES[0]:
         except Exception as exc:
             st.error(f"AI 요청 오류: {exc}")
 
-    # 음성 질문은 자동 읽기, 채팅 질문은 사용자가 선택한 경우에만 읽기.
+    # 답변 음성은 사용자 클릭으로만 생성/재생합니다. 화면 재실행/탭 이동 시 자동재생 금지.
     last_answer = st.session_state.get("last_answer", "")
     if last_answer:
         answer_id = st.session_state.get("able_audio_answer_id", "")
-        if st.session_state.get("able_reply_mode") == "voice":
-            should_play = True
-            st.caption("🔊 음성 질문에 대한 답변을 자동 재생합니다.")
-        else:
-            st.caption("🔊 이 답변을 음성으로 읽어드릴까요?")
-            yes_col, no_col = st.columns([1, 1])
-            with yes_col:
-                if st.button("🔊 네, 읽어줘", key="able_tts_yes"):
-                    st.session_state.able_tts_requested_id = answer_id
-            with no_col:
-                if st.button("아니요", key="able_tts_no"):
-                    st.session_state.able_tts_requested_id = ""
-            should_play = st.session_state.get("able_tts_requested_id") == answer_id
-        if should_play:
+        st.caption("🔊 음성 답변은 자동 재생되지 않습니다. 원할 때만 아래 버튼을 눌러 들으세요.")
+        if st.button("🔊 AI 답변 음성 듣기", key="able_tts_play_" + str(answer_id)):
             try:
                 if st.session_state.get("able_tts_audio_id") != answer_id:
                     with st.spinner("음성 답변 생성 중..."):
                         st.session_state.last_audio = make_speech(last_answer)
                         st.session_state.able_tts_audio_id = answer_id
-                if st.session_state.get("last_audio"):
-                    st.audio(st.session_state.last_audio, format="audio/mp3", autoplay=True)
+                st.session_state.able_tts_visible_id = answer_id
             except Exception as exc:
                 st.warning(f"음성 답변 생성 오류: {exc}")
+        if (st.session_state.get("able_tts_visible_id") == answer_id
+                and st.session_state.get("able_tts_audio_id") == answer_id
+                and st.session_state.get("last_audio")):
+            # Streamlit 기본 오디오 컨트롤에서 재생·일시정지·탐색을 지원합니다.
+            st.audio(st.session_state.last_audio, format="audio/mp3", autoplay=False)
+            if st.button("⏹️ 음성 플레이어 닫기", key="able_tts_hide_" + str(answer_id)):
+                st.session_state.able_tts_visible_id = ""
+                st.rerun()
 
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
@@ -2359,7 +2387,15 @@ if selected_page == PAGES[5]:
             url, _ = flow.authorization_url(
                 access_type="offline", prompt="consent", state=oauth_state(),
                 include_granted_scopes="false")
-            st.link_button("🔗 구글 계정 연결", url)
+            # Streamlit st.link_button은 새 탭을 열기 때문에 같은 탭에서 OAuth를 진행합니다.
+            # 인증 후 GOOGLE_REDIRECT_URI로 돌아오면 상단의 OAuth 콜백이 처리합니다.
+            st.markdown(
+                '<a href="' + escape(url, quote=True) + '" target="_self" '
+                'style="display:inline-block;padding:0.55rem 1rem;border-radius:0.55rem;'
+                'background:#2563eb;color:white;text-decoration:none;font-weight:600;">'
+                '🔗 구글 계정 연결</a>',
+                unsafe_allow_html=True,
+            )
         except Exception as exc:
             st.error(f"Google OAuth 설정 오류: {exc}")
 
