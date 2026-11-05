@@ -20,23 +20,84 @@ import pandas as pd
 import streamlit as st
 from openai import OpenAI
 
-st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""<style>
-.block-container{max-width:1250px;padding-top:1.6rem;padding-bottom:3rem}
-.hero{background:linear-gradient(125deg,#17334f,#245e76);border-radius:20px;padding:25px 29px;color:white;margin-bottom:20px}
-.hero h1{font-size:2rem;margin:0;color:white}.hero p{margin:.45rem 0 0;color:#e0f3f9}
-.section-note{color:#64748b;font-size:.88rem}
-.metric-shell{border:1px solid #e2e8f0;border-radius:14px;padding:17px;background:var(--secondary-background-color)}
-.metric-shell .big{font-size:1.65rem;font-weight:800;line-height:1.4}
-.metric-shell .small{font-size:.84rem;opacity:.75}
-.qbox{border:1px solid #d7e0e9;border-radius:15px;padding:18px;min-height:195px;margin:6px 0;background:var(--secondary-background-color)}
-.qhead{font-weight:800;font-size:1.03rem;margin-bottom:5px}
-.qhint{font-size:.78rem;opacity:.75;margin-bottom:12px}
-.qitem{border:1px solid #dce4ea;border-radius:10px;padding:9px 11px;margin:7px 0;background:var(--background-color);font-size:.87rem;line-height:1.5}
-.qitem small{opacity:.72}
-.tag{display:inline-block;border-radius:7px;padding:3px 7px;font-size:.75rem;font-weight:700;margin:4px 0}
-[data-testid="stDataFrame"]{border-radius:13px;overflow:hidden}
-</style>""", unsafe_allow_html=True)
+:root{color-scheme:dark;--able-bg:#0b0e24;--able-surface:#1c2040;--able-border:#49466d;--able-text:#f6f3ff;--able-muted:#b7b5d0;--able-accent:#a98aff}
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{
+ background:radial-gradient(ellipse 62% 48% at 78% 18%,rgba(101,54,184,.17),transparent 78%),#0b0e24!important;color:var(--able-text)!important}
+[data-testid="stHeader"]{background:rgba(11,14,36,.94)!important}
+[data-testid="stMainBlockContainer"],.block-container{max-width:1150px!important;padding:2rem 2rem 5rem!important;box-sizing:border-box!important}
+[data-testid="stSidebar"]{background:#11152e!important;border-right:1px solid #302e4d!important;overflow-x:hidden!important}
+[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding-left:1rem!important;padding-right:1rem!important;box-sizing:border-box!important;overflow-x:hidden!important}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{min-width:0!important}
+[data-testid="stSidebar"] [role="radiogroup"]{gap:.2rem!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label{padding:.45rem .55rem!important;border-radius:11px!important;min-width:0!important;align-items:center!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label:has(input:checked){background:#392b72!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label [data-testid="stRadioIcon"]{display:none!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label>div:first-child:has(input){width:0!important;min-width:0!important;margin:0!important;overflow:hidden!important}
+[data-testid="stSidebar"] *{color:var(--able-text)}
+[data-testid="stSidebar"] [data-testid="stExpander"]{background:#191d3c!important;border:1px solid #35365d!important}
+[data-testid="stAppViewContainer"] h1,[data-testid="stAppViewContainer"] h2,[data-testid="stAppViewContainer"] h3,[data-testid="stAppViewContainer"] p{color:var(--able-text)}
+[data-testid="stCaptionContainer"] p{color:var(--able-muted)!important}
+/* Uniform buttons, including secondary, navigation and OAuth link buttons */
+[data-testid="stAppViewContainer"] button,[data-testid="stSidebar"] button,
+[data-testid="stAppViewContainer"] a[data-testid="stLinkButton"]{
+ background:#262747!important;color:#f7f4ff!important;border:1px solid #5a527f!important;border-radius:11px!important;box-shadow:none!important}
+[data-testid="stAppViewContainer"] button *,[data-testid="stSidebar"] button *{color:inherit!important}
+[data-testid="stAppViewContainer"] button:hover,[data-testid="stSidebar"] button:hover{background:#3a3164!important;border-color:#a88aff!important}
+[data-testid="stAppViewContainer"] button[kind="primary"], [data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"]{background:#7351ce!important;color:white!important;border-color:#8e70ea!important}
+[data-testid="stAppViewContainer"] input,[data-testid="stAppViewContainer"] textarea,
+[data-testid="stAppViewContainer"] [data-baseweb="select"]>div,
+[data-testid="stSidebar"] input{background:#232642!important;color:#faf8ff!important;border-color:#595579!important;caret-color:#fff!important}
+[data-testid="stAppViewContainer"] input::placeholder,[data-testid="stAppViewContainer"] textarea::placeholder{color:#bcb6d2!important;opacity:1!important}
+[data-testid="stFileUploader"]{background:#1b203d!important;border-radius:13px!important}
+[data-testid="stFileUploaderDropzone"]{background:#202541!important;border:1px dashed #71659d!important;border-radius:12px!important}
+[data-testid="stFileUploaderDropzone"] *{color:#eee9ff!important}
+[data-testid="stPopoverBody"]{background:#1c203d!important;border:1px solid #65588d!important;color:#f6f2ff!important;max-width:calc(100vw - 24px)!important;box-sizing:border-box!important}
+[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"]{min-width:0!important}
+/* Restore calendar readable colors, keep all seven columns within their container */
+.cal-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
+.cal-grid>*{min-width:0!important;box-sizing:border-box!important}
+.cal-week{background:#303357!important;color:#e9e4ff!important;border-radius:7px!important;text-align:center!important}
+.cal-day{background:#171b37!important;border:1px solid #4a486d!important;border-radius:9px!important;min-width:0!important;overflow:hidden!important}
+.cal-num{color:#f5f2ff!important}.cal-other{opacity:.45}.cal-today{outline:2px solid #a98aff!important;outline-offset:-2px}
+.cal-chip{overflow-wrap:anywhere!important;word-break:break-word!important}
+.cal-task{background:#4c352b!important;color:#ffddae!important}.cal-meeting{background:#213c58!important;color:#b8e4ff!important}
+.cal-more{color:#c3bce2!important}
+/* Homepage hero and shortcut cards */
+.able-dark-hero{text-align:center;padding:clamp(24px,6vh,72px) 8px 28px!important}
+.able-star{font-size:52px;color:#c18cff;text-shadow:0 0 28px #784bc2}
+.able-brand{font-size:clamp(46px,5vw,72px);letter-spacing:.13em;font-weight:800;color:white;line-height:1.15}
+.able-tagline{font-size:1.02rem;font-weight:650;color:#e7dbff}
+.able-hero-sub{margin-top:20px;line-height:1.75;color:#c7c2df}
+.st-key-able_shortcut_mail button,.st-key-able_shortcut_calendar button,.st-key-able_shortcut_meeting button,.st-key-able_shortcut_tasks button{
+ min-height:94px!important;width:100%!important;background:linear-gradient(135deg,#302d58,#232342)!important;
+ border:1px solid #68578e!important;border-radius:17px!important;color:#fff!important;font-weight:700!important;font-size:.98rem!important}
+.st-key-able_shortcut_mail button:hover,.st-key-able_shortcut_calendar button:hover,.st-key-able_shortcut_meeting button:hover,.st-key-able_shortcut_tasks button:hover{background:#41366f!important;transform:translateY(-1px)}
+/* Existing attachment / text / calendar / mic / send row; no widget replacement */
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor){align-items:center!important;gap:.28rem!important;padding:.5rem .6rem!important;
+ background:#222344!important;border:1px solid #8768ce!important;border-radius:23px!important;box-shadow:0 12px 30px rgba(73,43,139,.2)!important}
+.able-input-anchor{display:none!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor)>[data-testid="stColumn"]{min-width:0!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input{min-height:42px!important;border-radius:11px!important;background:#292a4c!important;border:1px solid #5a517d!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button{min-height:40px!important;min-width:34px!important;padding:.25rem!important;background:transparent!important;border:0!important;color:#eee3ff!important;font-size:1.05rem!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover{background:#40366c!important}
+.st-key-able_inline_send button{background:#7450d2!important;color:#fff!important;border-radius:11px!important}
+[data-testid="stChatMessage"]{background:#1d2040;border:1px solid #36345e;border-radius:15px}
+@media(max-width:850px){[data-testid="stMainBlockContainer"],.block-container{padding:1rem .7rem 4rem!important}.able-dark-hero{padding:24px 4px 20px!important}
+ [data-testid="stHorizontalBlock"]:has(.able-input-anchor){gap:0!important;padding:.28rem!important}
+ .cal-day{padding:3px!important;min-height:64px!important}.cal-chip{font-size:9px!important;padding:2px!important}}
+</style>""",unsafe_allow_html=True)
+
+if selected_page == PAGES[0]:
+    # 홈 화면
+    if not st.session_state.messages:
+        st.markdown("""<div class="able-dark-hero">
+          <div class="able-star">✦</div>
+          <div class="able-brand">ABLE</div>
+          <div class="able-tagline">나의 AI 개인비서</div>
+          <div class="able-hero-sub">이메일, 일정, 회의록, 업무 정리까지<br>지금, 에이블에게 말해보세요.</div>
+        </div>""", unsafe_allow_html=True)
 
 # ABLE password gate (existing app feature)
 import hmac
@@ -69,8 +130,25 @@ def config(name, default=""):
             return default
         raise
 
-# 로그인 화면 제거: 앱을 열면 바로 홈 화면이 표시됩니다.
-# 주의: 공개 URL 사용자 모두가 앱에 접근할 수 있습니다.
+# 최초 접속 시 공통 비밀번호 확인 (Streamlit Secrets: ABLE_APP_PASSWORD)
+import hmac
+# ⭐ [통합 기능] 비밀번호 인증: 최초 접속 시 Secrets 비밀번호 확인
+app_password = str(config("ABLE_APP_PASSWORD", ""))
+if not app_password:
+    st.error("Streamlit Secrets에 ABLE_APP_PASSWORD를 설정해 주세요.")
+    st.stop()
+if not st.session_state.get("authenticated", False):
+    st.title("🔒 ABLE 로그인")
+    with st.form("able_login"):
+        supplied = st.text_input("접속 비밀번호", type="password")
+        do_login = st.form_submit_button("로그인", type="primary")
+    if do_login:
+        if hmac.compare_digest(supplied, app_password):
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("비밀번호가 올바르지 않습니다.")
+    st.stop()
 
 openai_api_key = config("OPENAI_API_KEY")
 if not openai_api_key:
@@ -119,7 +197,6 @@ def initialize_session_state():
         "able_reply_mode": "text",
         "able_audio_answer_id": "",
         "able_audio_cache": {},
-        "able_voice_draft": "",
         "able_last_draft": None,
         "able_meeting_history": [],
         "able_meeting_selected": "",
@@ -357,8 +434,7 @@ def explicit_send_intent(question):
     # 이미 작성된 이메일 초안이 있다면 '나랑 과장에게 보내줘'도 명시적 발송 명령.
     has_draft = bool(st.session_state.get("able_last_draft") or st.session_state.get("mail_draft"))
     recipient_context = bool(re.search(r"(에게|한테|나랑|나와|내게|나에게|과장|대리|팀장|방금|아까|작성한)", q))
-    confirmation_context = bool(re.search(r"(이대로|그대로|확인했|좋아|괜찮아)", q))
-    return action and (mail_context or (has_draft and (recipient_context or confirmation_context)))
+    return action and (mail_context or (has_draft and recipient_context))
 
 
 def record_send(to, subject, body, source, send_id):
@@ -396,8 +472,7 @@ def ask_ai(question, document="", raw_question=None):
     # 기존 초안을 보내는 명령은 모델 호출 없이 수신자를 모두 확인한 뒤 즉시 발송.
     is_draft_send = bool(re.search(r"(방금|아까|작성한|초안|그메일|그이메일)", raw_question))
     is_recipient_only_send = bool(re.search(r"(에게|한테|나랑|나와|나에게|내게)", raw_question)) and not re.search(r"(작성|요약해서|정리해서|새로)", raw_question)
-    is_confirmed_send = bool(re.search(r"(이대로|그대로|초안|방금|아까|작성한|그메일|그이메일|확인했|좋아|괜찮아)", raw_question))
-    if explicit_send_intent(raw_question) and draft and is_confirmed_send:
+    if explicit_send_intent(raw_question) and draft and (is_draft_send or is_recipient_only_send):
         if draft.get("subject") and draft.get("body"):
             try:
                 targets = resolve_recipients_from_request(raw_question, fallback=draft.get("to", ""))
@@ -430,10 +505,13 @@ def ask_ai(question, document="", raw_question=None):
             st.session_state.mail_subject = subject
             st.session_state.mail_body = body
             st.session_state.email_draft_revision = st.session_state.get("email_draft_revision", 0) + 1
-            answer = (f"📧 이메일 초안을 작성했어요. 아직 발송하지 않았습니다.\n\n"
-                      f"**받는 사람:** {recipient_display}\n\n**제목:** {subject}\n\n"
-                      f"**본문:**\n\n{body}\n\n"
-                      "내용을 확인한 후 '이대로 보내줘'라고 말하거나 이메일 메뉴에서 발송해 주세요.")
+            if explicit_send_intent(raw_question):
+                try:
+                    answer = send_once(recipients, subject, body, "채팅/음성 명령", str(uuid.uuid4()))
+                except Exception as exc:
+                    answer = f"이메일을 발송하지 못했습니다: {exc} 초안은 이메일 메뉴에 남아 있어요."
+            else:
+                answer = f"이메일 초안을 준비했어요. 수신자: {recipient_display}. 이메일 메뉴에서 확인하고 승인하면 발송할 수 있어요."
         except (ValueError, KeyError, TypeError) as exc:
             answer = f"수신자를 확인하지 못해 이메일을 발송하지 않았습니다: {exc}"
     else:
@@ -511,6 +589,7 @@ def structured_ai(instruction, document, schema):
     return json.loads(result.output_text)
 
 
+# ⭐ [통합 기능] AI 업무 추출: 평가 항목·근거·검토 필요 정보 추출
 def extract_tasks(document, meeting_day):
     prompt = f"""회의 기준일: {meeting_day.isoformat()}.
 회의에서 명시적으로 담당자가 배정된 업무만 추출하세요. 누가 실제로 실행하는지 구별하고
@@ -565,6 +644,7 @@ def extract_events(document, meeting_day):
     return rows
 
 
+# ⭐ [통합 기능] 업무 점수 기본 가중치: 중요도35 긴급도30 지연영향25 처리용이10
 DEFAULT_WEIGHTS = {
     "importance": 0.35,
     "urgency": 0.30,
@@ -654,6 +734,7 @@ def priority_score(task):
 # 3. 가중치 점수 모델 (추가)
 # ==========================================
 
+# ⭐ [통합 기능] 가중 우선순위 점수 계산
 def weighted_priority_score(task):
 
     # 기존 아이젠하워 매트릭스 활용
@@ -727,6 +808,7 @@ def weighted_priority_score(task):
 # 4. 업무 우선순위 자동 정렬 (추가)
 # ==========================================
 
+# ⭐ [통합 기능] 전체 업무 우선순위 자동 정렬
 def rank_tasks(tasks):
     ranked = []
 
@@ -835,6 +917,7 @@ def merge_events(previous, incoming):
     return result, added, updated, skipped
 
 
+# ⭐ [통합 기능] 업무 마감일과 내부 캘린더 동기화
 def sync_task_deadlines(events, tasks, enable_new=False):
     """업무 마감일을 종일 일정으로 반영. 이미 연결한 마감일은 업무 수정에 맞춰 갱신."""
     result = [normalize_event(e) for e in events]
@@ -890,6 +973,7 @@ def read_events_csv(uploaded):
     return results
 
 
+# ⭐ [통합 기능] 캘린더 4종 색상: 회의·직접 등록/일반 마감/3일 이내/기한 경과
 def render_month_calendar(events, month_start):
     """추가 JS 없이 Streamlit에서 월간 달력을 HTML로 시각화."""
     month_start = month_start.replace(day=1)
@@ -914,6 +998,12 @@ def render_month_calendar(events, month_start):
             for event in day_items[:4]:
                 src = event.get("source", "")
                 cls = "cal-task" if src == "업무 마감" else "cal-meeting"
+                if src == "업무 마감":
+                    days_left = (d - date.today()).days
+                    if days_left < 0:
+                        cls = "cal-task-overdue"
+                    elif days_left <= 3:
+                        cls = "cal-task-soon"
                 caption = (event.get("start", "") + " " if event.get("start") else "") + event["title"]
                 html.append(f'<div class="cal-chip {cls}" title="{escape(caption, quote=True)}">{escape(caption)}</div>')
             if len(day_items) > 4:
@@ -1143,7 +1233,13 @@ def analyze_meeting_automatically(meeting_day):
         raise ValueError('회의록 파일에 분석할 내용이 없습니다.')
     # 요약, 업무/우선순위, 일정, 메일 초안까지 자동으로 준비
     with st.spinner('1/3 · 회의록 요약 중...'):
-        summary = ask_ai('회의록을 요약하고 핵심 결정 사항과 후속 조치를 정리해줘.', document)
+        summary = ask_ai("""업로드한 회의록을 실제 사람이 작성한 자연스러운 회의록 문체로 정리해줘.
+제목은 '회의 내용 정리'로 하고, 논의된 내용, 확정된 결정, 담당자별 할 일과 기한,
+추가 확인이 필요한 사항을 실제 내용이 있는 항목에 한해 정리해줘.
+'핵심 결정 사항 및 후속 조치' 같은 기계적인 제목은 사용하지 마.
+# ⭐ [통합 기능] 회의 요약 문체 개선 및 점수 표현 제외
+중요도·긴급도·점수·사분면은 이 회의 요약에 쓰지 마.
+원문에 없는 내용은 추측하지 마.""", document)
     st.session_state.oneclick_summary = summary
     # 회의록에 맞는 제목과 본문을 별도로 AI 생성 (실제 발송 없음)
     try:
@@ -1188,17 +1284,30 @@ with st.sidebar:
     st.divider()
     st.markdown("**개인 설정**")
     user_name = st.text_input("사용자 이름", value="김 대리")
-    if st.button("대화 기록 초기화", use_container_width=True):
-        # 현재 채팅을 초기화합니다. 이전 대화 목록은 표시하거나 자동 저장하지 않습니다.
-        st.session_state.able_chat_threads = []
-        st.session_state.able_current_thread_id = None
-        st.session_state.messages = []
-        st.session_state.last_answer = ""
-        st.session_state.last_audio = None
-        st.session_state.able_tts_visible_id = ""
-        st.session_state.able_voice_draft = ""
-        st.session_state.able_voice_review_text = ""
-        st.rerun()
+    with st.expander("대화 관리", expanded=False):
+        for i, message in enumerate(st.session_state.messages):
+            c1, c2 = st.columns([5, 1])
+            with c1:
+                st.caption(f"{'나' if message['role'] == 'user' else '에이블'} · {str(message['content'])[:65]}")
+            with c2:
+                # ⭐ [통합 기능] 홈 대화 개별 삭제
+                if st.button("🗑️", key=f"remove_message_{i}", help="이 메시지 삭제"):
+                    st.session_state.messages.pop(i)
+                    st.rerun()
+        # ⭐ [통합 기능] 홈 전체 대화 삭제 및 확인
+        if st.button("전체 대화 삭제", use_container_width=True):
+            st.session_state.able_confirm_clear = True
+        if st.session_state.get("able_confirm_clear"):
+            st.warning("전체 대화를 삭제할까요?")
+            if st.button("삭제 확인", type="primary"):
+                st.session_state.messages = []
+                st.session_state.last_answer = ""
+                st.session_state.last_audio = None
+                st.session_state.able_confirm_clear = False
+                st.rerun()
+            if st.button("취소"):
+                st.session_state.able_confirm_clear = False
+                st.rerun()
     st.caption("업무 자료에 민감한 정보가 포함되지 않도록 확인하세요.")
     st.divider()
     with st.expander("✉️ 이메일 · 주소록 관리", expanded=False):
@@ -1293,7 +1402,8 @@ export default function(component) {
     clearTimeout(stopTimer);
     stopTimer = setTimeout(() => {
       if (active && recognition) recognition.stop();
-    }, 4000);
+    // ⭐ [통합 기능] 음성 인식 침묵 대기 3초
+    }, 3000);
   };
   if (!Recognition) {
     btn.title = '이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Edge를 이용하세요.';
@@ -1321,6 +1431,7 @@ export default function(component) {
       btn.textContent = '🔴';
       btn.setAttribute('aria-label', '음성 인식 취소');
       show('듣고 있어요...');
+      // ⭐ [통합 기능] 음성 인식 최대 60초
       maxTimer = setTimeout(() => { if (active) recognition.stop(); }, 60000);
     };
     recognition.onresult = (event) => {
@@ -1330,7 +1441,7 @@ export default function(component) {
       }
       transcript = combined.trim();
       if (transcript) {
-        show('말씀을 마치면 인식 결과를 확인할 수 있어요');
+        show('3초 동안 말이 없으면 질문을 전송합니다');
         scheduleEnd();
       }
     };
@@ -1356,7 +1467,7 @@ export default function(component) {
       btn.setAttribute('aria-label', '음성 질문 시작');
       if (!finished && !manualCancel && transcript) {
         finished = true;
-        show('인식 완료 · 아래에서 확인하세요');
+        show('질문 전송 중...');
         setTriggerValue('transcript', transcript);
       } else {
         show(manualCancel ? '취소됨' : '마이크를 눌러 다시 질문하세요');
@@ -1625,125 +1736,16 @@ def tab_voice_title(title, tab_id):
                 st.write(st.session_state.last_answer)
 
 
-
-# ABLE 2.2 unified visual system — one stylesheet replaces competing dark patches.
-st.markdown("""<style>
-:root{color-scheme:dark;--able-bg:#0b0e24;--able-surface:#1c2040;--able-border:#49466d;--able-text:#f6f3ff;--able-muted:#b7b5d0;--able-accent:#a98aff}
-.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{
- background:radial-gradient(ellipse 62% 48% at 78% 18%,rgba(101,54,184,.17),transparent 78%),#0b0e24!important;color:var(--able-text)!important}
-[data-testid="stHeader"]{background:rgba(11,14,36,.94)!important}
-[data-testid="stMainBlockContainer"],.block-container{max-width:1150px!important;padding:2rem 2rem 5rem!important;box-sizing:border-box!important}
-[data-testid="stSidebar"]{background:#11152e!important;border-right:1px solid #302e4d!important;overflow-x:hidden!important}
-[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding-left:1rem!important;padding-right:1rem!important;box-sizing:border-box!important;overflow-x:hidden!important}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{min-width:0!important}
-[data-testid="stSidebar"] [role="radiogroup"]{gap:.2rem!important}
-[data-testid="stSidebar"] [role="radiogroup"]>label{padding:.45rem .55rem!important;border-radius:11px!important;min-width:0!important;align-items:center!important}
-[data-testid="stSidebar"] [role="radiogroup"]>label:has(input:checked){background:#392b72!important}
-[data-testid="stSidebar"] [role="radiogroup"]>label [data-testid="stRadioIcon"]{display:none!important}
-[data-testid="stSidebar"] [role="radiogroup"]>label>div:first-child:has(input){width:0!important;min-width:0!important;margin:0!important;overflow:hidden!important}
-[data-testid="stSidebar"] *{color:var(--able-text)}
-[data-testid="stSidebar"] [data-testid="stExpander"]{background:#191d3c!important;border:1px solid #35365d!important}
-[data-testid="stAppViewContainer"] h1,[data-testid="stAppViewContainer"] h2,[data-testid="stAppViewContainer"] h3,[data-testid="stAppViewContainer"] p{color:var(--able-text)}
-[data-testid="stCaptionContainer"] p{color:var(--able-muted)!important}
-/* Uniform buttons, including secondary, navigation and OAuth link buttons */
-[data-testid="stAppViewContainer"] button,[data-testid="stSidebar"] button,
-[data-testid="stAppViewContainer"] a[data-testid="stLinkButton"]{
- background:#262747!important;color:#f7f4ff!important;border:1px solid #5a527f!important;border-radius:11px!important;box-shadow:none!important}
-[data-testid="stAppViewContainer"] button *,[data-testid="stSidebar"] button *{color:inherit!important}
-[data-testid="stAppViewContainer"] button:hover,[data-testid="stSidebar"] button:hover{background:#3a3164!important;border-color:#a88aff!important}
-[data-testid="stAppViewContainer"] button[kind="primary"], [data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"]{background:#7351ce!important;color:white!important;border-color:#8e70ea!important}
-[data-testid="stAppViewContainer"] input,[data-testid="stAppViewContainer"] textarea,
-[data-testid="stAppViewContainer"] [data-baseweb="select"]>div,
-[data-testid="stSidebar"] input{background:#232642!important;color:#faf8ff!important;border-color:#595579!important;caret-color:#fff!important}
-[data-testid="stAppViewContainer"] input::placeholder,[data-testid="stAppViewContainer"] textarea::placeholder{color:#bcb6d2!important;opacity:1!important}
-[data-testid="stFileUploader"]{background:#1b203d!important;border-radius:13px!important}
-[data-testid="stFileUploaderDropzone"]{background:#202541!important;border:1px dashed #71659d!important;border-radius:12px!important}
-[data-testid="stFileUploaderDropzone"] *{color:#eee9ff!important}
-[data-testid="stPopoverBody"]{background:#1c203d!important;border:1px solid #65588d!important;color:#f6f2ff!important;max-width:calc(100vw - 24px)!important;box-sizing:border-box!important}
-[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"]{min-width:0!important}
-/* Restore calendar readable colors, keep all seven columns within their container */
-.cal-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
-.cal-grid>*{min-width:0!important;box-sizing:border-box!important}
-.cal-week{background:#303357!important;color:#e9e4ff!important;border-radius:7px!important;text-align:center!important}
-.cal-day{background:#171b37!important;border:1px solid #4a486d!important;border-radius:9px!important;min-width:0!important;overflow:hidden!important}
-.cal-num{color:#f5f2ff!important}.cal-other{opacity:.45}.cal-today{outline:2px solid #a98aff!important;outline-offset:-2px}
-.cal-chip{overflow-wrap:anywhere!important;word-break:break-word!important}
-.cal-task{background:#4c352b!important;color:#ffddae!important}.cal-meeting{background:#213c58!important;color:#b8e4ff!important}
-.cal-more{color:#c3bce2!important}
-/* Homepage hero and shortcut cards */
-.able-dark-hero{text-align:center;padding:clamp(24px,6vh,72px) 8px 28px!important}
-.able-star{font-size:52px;color:#c18cff;text-shadow:0 0 28px #784bc2}
-.able-brand{font-size:clamp(46px,5vw,72px);letter-spacing:.13em;font-weight:800;color:white;line-height:1.15}
-.able-tagline{font-size:1.02rem;font-weight:650;color:#e7dbff}
-.able-hero-sub{margin-top:20px;line-height:1.75;color:#c7c2df}
-.st-key-able_shortcut_mail button,.st-key-able_shortcut_calendar button,.st-key-able_shortcut_meeting button,.st-key-able_shortcut_tasks button{
- min-height:94px!important;width:100%!important;background:linear-gradient(135deg,#302d58,#232342)!important;
- border:1px solid #68578e!important;border-radius:17px!important;color:#fff!important;font-weight:700!important;font-size:.98rem!important}
-.st-key-able_shortcut_mail button:hover,.st-key-able_shortcut_calendar button:hover,.st-key-able_shortcut_meeting button:hover,.st-key-able_shortcut_tasks button:hover{background:#41366f!important;transform:translateY(-1px)}
-/* Existing attachment / text / calendar / mic / send row; no widget replacement */
-[data-testid="stHorizontalBlock"]:has(.able-input-anchor){align-items:center!important;gap:.28rem!important;padding:.5rem .6rem!important;
- background:#222344!important;border:1px solid #8768ce!important;border-radius:23px!important;box-shadow:0 12px 30px rgba(73,43,139,.2)!important}
-.able-input-anchor{display:none!important}
-[data-testid="stHorizontalBlock"]:has(.able-input-anchor)>[data-testid="stColumn"]{min-width:0!important}
-[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input{min-height:42px!important;border-radius:11px!important;background:#292a4c!important;border:1px solid #5a517d!important}
-[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button{min-height:40px!important;min-width:34px!important;padding:.25rem!important;background:transparent!important;border:0!important;color:#eee3ff!important;font-size:1.05rem!important}
-[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover{background:#40366c!important}
-.st-key-able_inline_send button{background:#7450d2!important;color:#fff!important;border-radius:11px!important}
-[data-testid="stChatMessage"]{background:#1d2040;border:1px solid #36345e;border-radius:15px}
-@media(max-width:850px){[data-testid="stMainBlockContainer"],.block-container{padding:1rem .7rem 4rem!important}.able-dark-hero{padding:24px 4px 20px!important}
- [data-testid="stHorizontalBlock"]:has(.able-input-anchor){gap:0!important;padding:.28rem!important}
- .cal-day{padding:3px!important;min-height:64px!important}.cal-chip{font-size:9px!important;padding:2px!important}}
-</style>""",unsafe_allow_html=True)
-
 if selected_page == PAGES[0]:
     # 홈 화면
-    if not st.session_state.messages:
-        st.markdown("""<div class="able-dark-hero">
-          <div class="able-star">✦</div>
-          <div class="able-brand">ABLE</div>
-          <div class="able-tagline">나의 AI 개인비서</div>
-          <div class="able-hero-sub">이메일, 일정, 회의록, 업무 정리까지<br>지금, 에이블에게 말해보세요.</div>
-        </div>""", unsafe_allow_html=True)
-        shortcut_cols = st.columns(4, gap="small")
-        shortcuts = [
-            ("✉️ 이메일 작성", PAGES[4], "able_shortcut_mail"),
-            ("📅 일정 확인", PAGES[3], "able_shortcut_calendar"),
-            ("📄 회의록 요약", PAGES[1], "able_shortcut_meeting"),
-            ("✅ 업무 정리", PAGES[2], "able_shortcut_tasks"),
-        ]
-        for col, (label, destination, key) in zip(shortcut_cols, shortcuts):
-            with col:
-                st.button(label, key=key, use_container_width=True,
-                          on_click=navigate_to, args=(destination,))
+    st.markdown("""<div class="able-home">
+      <div class="able-orb">✦</div>
+      <h1>무엇을 도와드릴까요?</h1>
+      <p>당신의 AI 개인비서, ABLE</p>
+    </div>""", unsafe_allow_html=True)
     for message in st.session_state.messages[-10:]:
         with st.chat_message(message["role"]):
             st.write(message["content"])
-    if st.session_state.get("able_voice_pending_text") is not None:
-        st.session_state.able_voice_review_text = st.session_state.pop("able_voice_pending_text")
-    if st.session_state.get("able_voice_draft"):
-        with st.container(border=True):
-            st.markdown("**🎙️ 인식된 문장 확인 · 수정 가능**")
-            st.text_area("음성 인식 결과", key="able_voice_review_text", height=85)
-            vc1, vc2 = st.columns(2)
-            with vc1:
-                send_voice = st.button("➤ 질문 전송", key="able_voice_review_send", use_container_width=True)
-            with vc2:
-                discard_voice = st.button("🗑️ 삭제 · 다시 녹음", key="able_voice_review_delete", use_container_width=True)
-            if discard_voice:
-                st.session_state.able_voice_draft = ""
-                st.session_state.able_voice_pending_text = ""
-                st.session_state.able_voice_generation = st.session_state.get("able_voice_generation", 0) + 1
-                st.rerun()
-            if send_voice:
-                spoken_question = st.session_state.get("able_voice_review_text", "").strip()
-                if spoken_question:
-                    st.session_state.able_voice_draft = ""
-                    st.session_state.last_transcript = spoken_question
-                    handle_home_request(spoken_question, user_name)
-                    st.rerun()
-                else:
-                    st.warning("전송할 문장을 입력해 주세요.")
-
     # 입력창 Enter / 전송 화살표 공통 콜백
     def queue_inline_question():
         pending = st.session_state.get("able_inline_question", "").strip()
@@ -1753,11 +1755,23 @@ if selected_page == PAGES[0]:
         else:
             st.session_state.able_empty_send = True
 
-    # 음성 답변 설정은 사이드바에 유지하고 파일 첨부는 입력창 왼쪽으로 이동
-    with st.sidebar:
-        with st.expander("🔊 음성 답변 설정", expanded=False):
-            st.toggle("AI 답변 음성 재생", value=False, key="home_tts_enabled")
+    # 음성 질문은 자동 읽기, 텍스트 질문은 사용자에게 선택권 제공
 
+    st.markdown("""<style>
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
+        align-items:center; gap:0.15rem;
+        border:1px solid #e1e5ec; border-radius:32px;
+        padding:.28rem .42rem; background:white;
+        box-shadow:0 2px 10px rgba(20,35,60,.035);
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) div[data-testid="stTextInput"] input {
+        border:none; box-shadow:none; background:transparent;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
+        border:0; box-shadow:none; background:transparent; padding:.12rem;
+    }
+    .able-input-anchor {display:none}
+    </style>""", unsafe_allow_html=True)
     attach_col, input_col, cal_col, mic_col, send_col = st.columns(
         [0.62, 8.7, 0.55, 0.55, 0.55], vertical_alignment="center", gap="small"
     )
@@ -1801,70 +1815,93 @@ if selected_page == PAGES[0]:
                     ).replace(day=1).isoformat()
                     st.rerun()
             st.markdown("""<style>
-            div[data-testid="stPopoverBody"] {width:min(520px,calc(100vw - 28px));max-width:calc(100vw - 28px);}
+            div[data-testid="stPopoverBody"] {min-width:360px;}
             .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
-            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#303357;color:#e9e4ff;border-radius:5px}
+            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#eef2f7;border-radius:5px}
             .cal-day{min-height:42px;padding:4px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
             .cal-other{opacity:.3}.cal-today{outline:2px solid #4a86bd}
             .cal-num{font-size:11px;font-weight:700;margin-bottom:3px}
             .cal-chip{font-size:9px;line-height:1.2;padding:2px;margin:2px 0;border-radius:3px;overflow-wrap:anywhere}
-            .cal-task{background:#fff0d7;color:#8a4300}
+            .cal-task{background:#fff0d7;color:#8a4300;border-left:3px solid #ed9c28}
+            .cal-task-soon{background:#fee2e2;color:#991b1b;border-left:4px solid #dc2626;font-weight:700}
+            .cal-task-overdue{background:#f1f5f9;color:#64748b;border-left:4px solid #94a3b8}
             .cal-meeting{background:#e1f1ff;color:#164b76}
             .cal-more{font-size:9px}
             </style>""", unsafe_allow_html=True)
             st.markdown(render_month_calendar(st.session_state.events, cursor), unsafe_allow_html=True)
+            st.caption("🔵 회의/직접 등록 · 🟠 일반 업무 마감 · 🔴 3일 이내 마감 · ⚪ 기한 경과")
             st.button("전체 일정 관리 열기", key="home_open_calendar",
                       on_click=navigate_to, args=(PAGES[3],))
 
     with mic_col:
-        with st.popover("🎙️", help="마이크로 음성 질문하기"):
-            st.markdown("**음성으로 에이블에게 질문하기**")
-            st.caption("녹음 → 인식 → 문장 확인 → 전송")
-            recording = st.audio_input("마이크 녹음", key=f"home_voice_recording_{st.session_state.get('able_voice_generation', 0)}")
-            if st.button("음성 인식하기", key="home_voice_recognize", use_container_width=True):
-                if recording is None:
-                    st.warning("먼저 음성을 녹음해 주세요.")
-                else:
-                    try:
-                        with st.spinner("한국어 음성을 인식하고 있어요..."):
-                            result = client.audio.transcriptions.create(
-                                model="gpt-4o-transcribe",
-                                file=("home_recording.wav", recording.getvalue(), "audio/wav"),
-                                language="ko",
-                                prompt="한국어 업무비서 대화. 회의록, 이메일, 일정, 담당자, 업무 우선순위.",
-                            )
-                        spoken = str(result.text or "").strip()
-                        if spoken:
-                            st.session_state.able_voice_draft = spoken
-                            st.session_state.able_voice_pending_text = spoken
-                            st.rerun()
-                        else:
-                            st.warning("음성을 인식하지 못했어요. 다시 녹음해 주세요.")
-                    except Exception as exc:
-                        st.error(f"음성 인식 오류: {exc}")
+        # 브라우저 내장 음성 인식: 마이크 한 번 클릭 → 침묵 시 자동 전송
+        voice_result = able_voice_button(
+            key="able_voice_oneclick",
+            on_transcript_change=lambda: None,
+        )
     with send_col:
         st.button("➤", key="able_inline_send", help="질문 전송",
                   use_container_width=True, on_click=queue_inline_question)
+
+    # Streamlit component trigger fields may be absent until the user interacts.
+    # Access optional fields defensively to avoid AttributeError/KeyError.
+    voice_transcript = voice_result.get("transcript") if voice_result is not None else None
+    voice_error = voice_result.get("error") if voice_result is not None else None
+
+    if voice_transcript:
+        spoken_question = str(voice_transcript).strip()
+        if spoken_question:
+            st.session_state.last_transcript = spoken_question
+            try:
+                with st.spinner(f"음성 질문 처리 중: {spoken_question}"):
+                    st.session_state.able_reply_mode = "voice"
+                    handle_home_request(spoken_question, user_name)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"음성 질문 처리 오류: {exc}")
+    if voice_error:
+        st.warning(str(voice_error))
 
     if st.session_state.pop("able_empty_send", False):
         st.warning("질문을 입력해주세요.")
     pending_question = st.session_state.pop("able_pending_question", None)
     if pending_question:
         try:
+            st.session_state.able_reply_mode = "text"
             handle_home_request(pending_question, user_name)
             st.rerun()
         except Exception as exc:
             st.error(f"AI 요청 오류: {exc}")
 
-    # 답변 음성은 사용자가 요청했을 때만 재생합니다.
-    if st.session_state.get("last_answer"):
-        if st.button("🔊 마지막 답변 듣기", key="able_home_listen"):
+    # 음성 질문은 자동 읽기, 채팅 질문은 사용자가 선택한 경우에만 읽기.
+    last_answer = st.session_state.get("last_answer", "")
+    if last_answer:
+        answer_id = st.session_state.get("able_audio_answer_id", "")
+        if st.session_state.get("able_reply_mode") == "voice":
+            should_play = True
+            st.caption("🔊 음성 답변이 준비됩니다. 아래 플레이어에서 재생·일시정지할 수 있습니다.")
+        else:
+            st.caption("🔊 이 답변을 음성으로 읽어드릴까요?")
+            yes_col, no_col = st.columns([1, 1])
+            with yes_col:
+                if st.button("🔊 네, 읽어줘", key="able_tts_yes"):
+                    st.session_state.able_tts_requested_id = answer_id
+            with no_col:
+                if st.button("아니요", key="able_tts_no"):
+                    st.session_state.able_tts_requested_id = ""
+            should_play = st.session_state.get("able_tts_requested_id") == answer_id
+        if should_play:
             try:
-                st.session_state.able_home_audio = make_speech(st.session_state.last_answer)
+                if st.session_state.get("able_tts_audio_id") != answer_id:
+                    with st.spinner("음성 답변 생성 중..."):
+                        st.session_state.last_audio = make_speech(last_answer)
+                        st.session_state.able_tts_audio_id = answer_id
+                if st.session_state.get("last_audio"):
+                    # ⭐ [통합 기능] 음성 답변 자동 재생 해제·기본 재생/일시정지
+                    st.audio(st.session_state.last_audio, format="audio/mp3", autoplay=False)
             except Exception as exc:
-                st.error(f"음성 생성 오류: {exc}")
-        if st.session_state.get("able_home_audio"):
-            st.audio(st.session_state.able_home_audio, format="audio/mp3", autoplay=False)
+                st.warning(f"음성 답변 생성 오류: {exc}")
+
 
 # 회의록 원클릭 분석: 분석은 자동, 외부 작업은 명시적 승인
 if selected_page == PAGES[1]:
@@ -1938,8 +1975,16 @@ if selected_page == PAGES[1]:
             ranked = sorted(tasks, key=lambda x: priority_score(x)[1], reverse=True)
             for rank, task in enumerate(ranked[:3], 1):
                 q, score, _ = priority_score(task)
-                st.write(f"**{rank}. {task.get('task', '')}** · 담당 {task.get('owner') or '확인 필요'} · 마감 {task.get('due') or '미확인'} · {q} ({score:.1f}점)")
-            st.caption("전체 업무와 아이젠하워 4분면은 '업무 우선순위' 메뉴에서 확인·수정할 수 있습니다.")
+                # ⭐ [통합 기능] 매우 높은 업무만 빨간 글씨로 강조
+                # 회의 요약에서는 점수를 숨기고, 중요도와 긴급도가 모두 5인 업무만 빨간색으로 표시
+                urgency = effective_urgency(task, priority_score(task)[2])
+                is_very_high = int(task.get("importance") or 3) == 5 and urgency == 5
+                name = escape(str(task.get("task") or ""))
+                owner = escape(str(task.get("owner") or "확인 필요"))
+                due = escape(str(task.get("due") or "미확인"))
+                color = "#dc2626" if is_very_high else "inherit"
+                st.markdown(f'<div style="padding:7px 0;color:{color};font-weight:{"800" if is_very_high else "500"}">{rank}. {name} · 담당 {owner} · 마감 {due}</div>', unsafe_allow_html=True)
+            st.caption("전체 업무는 '업무 우선순위' 메뉴에서 확인·수정할 수 있습니다.")
         else:
             st.info("추출된 업무가 없습니다.")
 
@@ -2076,6 +2121,7 @@ if selected_page == PAGES[2]:
         for col,num,label in zip(metric_cols,[len(tasks),high,missing,len({str(t.get('owner','')) for t in tasks if t.get('owner')})],["추출 업무","긴급·중요","마감일 미확인","담당자 수"]):
             with col:
                 st.metric(label,num)
+        # ⭐ [통합 기능] 가중 점수 기반 TOP3 표시
         st.markdown("#### 🏅 우선순위 TOP 3")
         for rank,t in enumerate(ranked[:3],start=1):
             with st.container(border=True):
@@ -2089,21 +2135,23 @@ if selected_page == PAGES[2]:
                         st.warning("AI 추론 또는 근거 부족: 담당자·마감일·점수를 확인하세요.")
                 with b:
                     st.metric("가중 점수",f"{t['score']:.1f}/10")
-        st.markdown("#### 🧭 아이젠하워 매트릭스")
-        qs=[("긴급·중요","즉시 실행"),("비긴급·중요","계획 수립"),("긴급·비중요","위임 검토"),("비긴급·비중요","보류 검토")]
+        st.markdown("#### 업무 분류")
+        # ⭐ [통합 기능] 업무 4분면별 서로 다른 색상 표시
+        qs=[("긴급·중요","즉시 실행","#dc2626","#fff1f2"),("비긴급·중요","계획 수립","#2563eb","#eff6ff"),("긴급·비중요","위임 검토","#d97706","#fffbeb"),("비긴급·비중요","보류 검토","#64748b","#f1f5f9")]
         for offset in [0,2]:
             cols=st.columns(2)
-            for col,(quadrant,hint) in zip(cols,qs[offset:offset+2]):
+            for col,(quadrant,hint,accent,tint) in zip(cols,qs[offset:offset+2]):
                 with col:
                     subset=[t for t in ranked if t['quadrant']==quadrant]
                     with st.container(border=True):
-                        st.markdown(f"**{quadrant} ({len(subset)}) · {hint}**")
+                        st.markdown(f'<div style="border-left:5px solid {accent};background:{tint};padding:12px;border-radius:9px;color:{accent};font-weight:800">{escape(quadrant)} ({len(subset)}) · {escape(hint)}</div>', unsafe_allow_html=True)
                         for t in subset:
                             st.write(f"• {t.get('task','')} — {t['score']:.1f}/10")
         st.markdown("#### ✍️ 업무 점수와 근거 수정")
         st.caption("AI가 추정한 값은 직접 수정할 수 있어요. 변경 후 저장하면 순위가 재계산됩니다.")
         frame = pd.DataFrame(tasks)
-        editable = ["task","owner","due","importance","impact","ease","stated_urgency","reason","evidence","needs_review"]
+        # ⭐ [최종 수정 1/3] 검토 필요 체크박스를 편집 표의 맨 왼쪽으로 이동
+        editable = ["needs_review","task","owner","due","importance","impact","ease","stated_urgency","reason","evidence"]
         for key in editable:
             if key not in frame.columns:
                 frame[key] = None if key == "stated_urgency" else (False if key == "needs_review" else (3 if key in ("importance","impact","ease") else ""))
@@ -2148,7 +2196,17 @@ if selected_page == PAGES[2]:
                 st.success("업무 평가를 저장했습니다.")
                 st.rerun()
         st.markdown("#### 📋 전체 우선순위")
-        table=pd.DataFrame([{"업무":t.get('task',''),"담당자":t.get('owner',''),"마감일":t.get('due',''),"분류":t['quadrant'],"가중 점수":t['score'],"평가 근거":t.get('reason',''),"검토 필요":t.get('needs_review',False)} for t in ranked])
+        # ⭐ [최종 수정 2/3] 전체 업무 순위 맨 왼쪽에 1부터 시작하는 순위 열 추가
+        # ⭐ [최종 수정 3/3] 전체 업무 순위에서 검토 필요 열 제거 (검토는 편집 표에서만)
+        table=pd.DataFrame([{
+            "순위": rank,
+            "업무": t.get('task', ''),
+            "담당자": t.get('owner', ''),
+            "마감일": t.get('due', ''),
+            "분류": t['quadrant'],
+            "가중 점수": t['score'],
+            "평가 근거": t.get('reason', ''),
+        } for rank, t in enumerate(ranked, 1)])
         st.dataframe(table,hide_index=True,use_container_width=True)
         st.download_button("⬇️ 업무 현황 CSV 다운로드",table.to_csv(index=False).encode('utf-8-sig'),"aivle_tasks.csv",mime="text/csv")
         st.caption("점수는 AI 평가와 날짜 기반 긴급도에 따른 추정치입니다. 마감일 미지정은 긴급도를 확정하지 않으며, 회의록의 명시적 긴급도는 우선 적용합니다.")
@@ -2250,8 +2308,8 @@ if selected_page == PAGES[3]:
             st.rerun()
     st.markdown("""<style>
     .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
-    .cal-week{background:#303357;color:#e9e4ff;text-align:center;font-weight:700;padding:9px;border-radius:7px}
-    .cal-day{min-height:102px;padding:8px;border:1px solid #4a486d;border-radius:10px;background:#171b37;overflow:hidden}
+    .cal-week{background:#eaf0f6;color:#243449;text-align:center;font-weight:700;padding:9px;border-radius:7px}
+    .cal-day{min-height:102px;padding:8px;border:1px solid #d9e1ed;border-radius:10px;background:var(--background-color);overflow:hidden}
     .cal-other{opacity:.38}.cal-today{outline:2px solid #2383c6}
     .cal-num{font-size:13px;font-weight:800;margin-bottom:7px}
     .cal-chip{padding:4px 6px;border-radius:5px;margin:4px 0;font-size:11px;line-height:1.4;word-break:break-word}
@@ -2498,3 +2556,32 @@ if selected_page == PAGES[5]:
     for ev in st.session_state.google_week_events:
         when = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date", "")
         st.write(f"📅 {ev.get('summary', '(제목 없음)')} — {when}")
+
+
+# ABLE integration: final visual overrides (no OAuth behavior changes)
+st.markdown("""<style>
+/* Sidebar clipping and menu radio indicators */
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {padding-left:1.2rem!important;padding-right:1.2rem!important;overflow-x:visible!important}
+[data-testid="stSidebar"] [role="radiogroup"] label {overflow:visible!important}
+[data-testid="stSidebar"] [role="radiogroup"] [data-testid="stRadioIcon"] {display:none!important}
+/* OAuth link is rendered as an anchor: ensure both link and children are visible */
+a[data-testid="stLinkButton"], [data-testid="stLinkButton"] a, a[data-testid="stLinkButton"] * {background:#312b56!important;color:#fff!important;opacity:1!important;border-color:#8872c9!important;text-decoration:none!important}
+a[data-testid="stLinkButton"]:hover, [data-testid="stLinkButton"] a:hover {background:#4d3b83!important;color:#fff!important}
+/* Generic buttons and disabled states stay readable */
+.stApp button, .stApp button *, .stApp [data-testid="stBaseButton-secondary"], .stApp [data-testid="stBaseButton-secondary"] * {color:#f7f3ff!important}
+.stApp button:disabled, .stApp button:disabled * {color:#c2bdd8!important;opacity:.72!important}
+/* Home inline composer: do not change its five original functional columns */
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {background:#222340!important;border:1px solid #8068bf!important;border-radius:28px!important;padding:7px 9px!important;align-items:center!important;gap:5px!important;overflow:visible!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) input {background:#222340!important;color:#fff!important;border:0!important;box-shadow:none!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {background:transparent!important;border:0!important;color:#f6efff!important;min-width:32px!important;padding:6px!important;font-size:16px!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stPopover"] {min-width:0!important}
+/* Popover width prevents mini calendar from being clipped by narrow icon columns */
+[data-testid="stPopoverBody"]:has(.cal-grid) {width:min(570px,calc(100vw - 36px))!important;min-width:min(570px,calc(100vw - 36px))!important;max-width:calc(100vw - 36px)!important;overflow-x:auto!important}
+[data-testid="stPopoverBody"] .cal-grid {display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;width:100%!important;min-width:0!important}
+[data-testid="stPopoverBody"] .cal-grid .cal-day {min-width:0!important;overflow:hidden!important}
+/* Date inputs and file upload readability */
+[data-testid="stDateInput"] input, [data-testid="stFileUploaderDropzone"] {background:#252746!important;color:#fff!important}
+[data-testid="stFileUploaderDropzone"] button {background:#3b315e!important;color:#fff!important}
+/* Calendar's own month buttons */
+.stApp button[kind="secondary"],.stApp button[kind="tertiary"] {background:#2d2b51!important;color:#fff!important}
+</style>""",unsafe_allow_html=True)
