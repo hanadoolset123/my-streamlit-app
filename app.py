@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 from openai import OpenAI
 
-st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="에이블 | AI 업무비서", page_icon="🤖", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""<style>
 .block-container{max-width:1250px;padding-top:1.6rem;padding-bottom:3rem}
 .hero{background:linear-gradient(125deg,#17334f,#245e76);border-radius:20px;padding:25px 29px;color:white;margin-bottom:20px}
@@ -1626,150 +1626,73 @@ def tab_voice_title(title, tab_id):
 
 
 
-# ABLE dark-minimal visual theme (presentation only; existing functionality preserved)
+# ABLE 2.2 unified visual system — one stylesheet replaces competing dark patches.
 st.markdown("""<style>
-:root {color-scheme:dark;}
-[data-testid="stAppViewContainer"], [data-testid="stMain"], .stApp {
-  background: radial-gradient(ellipse 75% 52% at 72% 22%, rgba(102,45,194,.20), transparent 72%),
-              radial-gradient(ellipse 54% 42% at 14% 88%, rgba(46,68,178,.16), transparent 72%),
-              #090d23 !important;
-  color:#f4f1ff !important;
-}
-[data-testid="stHeader"] {background:rgba(9,13,35,.82) !important;}
-[data-testid="stSidebar"] {background:#0d1230 !important; border-right:1px solid rgba(168,145,255,.14) !important;}
-[data-testid="stSidebar"] * {color:#e6e3fb;}
-[data-testid="stSidebar"] [data-testid="stExpander"] {
-  background:#171b3c !important; border:1px solid #34315e !important;
-}
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-  background:linear-gradient(110deg,#4930a2,#34236e);border-radius:11px;
-}
-.block-container {max-width:1150px !important;padding-top:2.4rem !important;}
-.able-dark-hero {text-align:center;padding:clamp(18px,4vh,48px) 8px 20px;}
-.able-star {font-size:57px;line-height:1.2;color:#c58aff;text-shadow:0 0 36px rgba(159,92,255,.65);}
-.able-brand {font-size:clamp(45px,6vw,76px);font-weight:800;letter-spacing:.13em;color:#fff;line-height:1.2;}
-.able-tagline {color:#e1d8ff;font-size:1.08rem;font-weight:650;}
-.able-hero-sub {margin-top:19px;color:#b9b9d7;font-size:1rem;line-height:1.8;}
-/* Existing combined input: preserve attachment, calendar, microphone and send controls */
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
-  border:1px solid #7551c4 !important;border-radius:25px !important;
-  background:rgba(28,30,65,.96) !important;
-  box-shadow:0 0 24px rgba(133,77,243,.16) !important;
-  padding:.42rem .55rem !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) input {
-  background:transparent !important;color:#fff !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) input::placeholder {color:#aaa7c6 !important;}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
-  background:transparent !important;color:#e8d9ff !important;border:0 !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover {background:#40316b !important;}
-[data-testid="stChatMessage"] {background:rgba(28,30,62,.75);border:1px solid #302c59;border-radius:17px;padding:.7rem 1rem;}
-[data-testid="stPopoverBody"] {background:#1a1b39 !important;color:#f4f1ff !important;border:1px solid #51407c !important;}
-[data-testid="stPopoverBody"] * {color:inherit;}
-[data-testid="stAppViewContainer"] p,[data-testid="stAppViewContainer"] h1,[data-testid="stAppViewContainer"] h2,[data-testid="stAppViewContainer"] h3 {color:#f4f1ff;}
-[data-testid="stAppViewContainer"] [data-testid="stTextInput"] input,
-[data-testid="stAppViewContainer"] textarea {color:#f4f1ff;}
-@media(max-width:680px) {
- .block-container{padding-top:1rem !important;}
- .able-dark-hero{padding:16px 0 12px;}
- .able-brand{font-size:44px;}
- div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {gap:0 !important;padding:.2rem !important;}
-}
-</style>""",unsafe_allow_html=True)
-
-# ABLE 2.1: dark theme refinements (presentation-only, no business logic changes)
-st.markdown("""<style>
-/* Consistent colors for Streamlit widgets, including popovers and sidebar. */
-:root { color-scheme: dark; }
-[data-testid="stAppViewContainer"] { color:#F5F3FF !important; }
-[data-testid="stSidebar"] { background:linear-gradient(180deg,#10132E,#0C1027) !important; }
-[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
-[data-testid="stSidebar"] label p {color:#D9D5F2 !important;}
-[data-testid="stSidebar"] [role="radiogroup"] {gap:.38rem !important;}
-[data-testid="stSidebar"] [role="radiogroup"] > label {
-    padding:.64rem .78rem !important; border-radius:12px !important;
-    border:1px solid transparent !important; transition:background .18s ease;
-}
-[data-testid="stSidebar"] [role="radiogroup"] > label:hover {background:#242047 !important;}
-[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {
-    background:linear-gradient(100deg,#46318C,#30275D) !important;
-    border-color:#765BC0 !important;
-}
-/* Hide radio circles visually, but keep the underlying input for keyboard access. */
-[data-testid="stSidebar"] [role="radiogroup"] > label [data-testid="stRadioIcon"] {display:none !important;}
-[data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child:has(input) {width:0 !important;min-width:0 !important;overflow:hidden !important;}
-[data-testid="stSidebar"] button {background:#232446 !important;color:#F5F3FF !important;border:1px solid #45436C !important;}
-[data-testid="stSidebar"] button:hover {background:#37305D !important;border-color:#9A7DFF !important;}
-[data-testid="stSidebar"] input {background:#1C203E !important;color:#F5F3FF !important;border-color:#555174 !important;}
-/* Home shortcuts: scoped to unique Streamlit widget keys; never recolor other pages. */
-.st-key-able_shortcut_mail button,
-.st-key-able_shortcut_calendar button,
-.st-key-able_shortcut_meeting button,
-.st-key-able_shortcut_tasks button {
-    min-height:96px !important; border-radius:18px !important;
-    background:linear-gradient(145deg,rgba(83,69,149,.55),rgba(31,33,70,.98)) !important;
-    border:1px solid rgba(166,139,255,.45) !important;
-    color:#F7F4FF !important; font-size:1.02rem !important;font-weight:700 !important;
-    box-shadow:0 12px 32px rgba(0,0,0,.18) !important;
-    transition:transform .16s ease,background .16s ease,border-color .16s ease;
-}
-.st-key-able_shortcut_mail button *,
-.st-key-able_shortcut_calendar button *,
-.st-key-able_shortcut_meeting button *,
-.st-key-able_shortcut_tasks button * {color:#F7F4FF !important;}
-.st-key-able_shortcut_mail button:hover,
-.st-key-able_shortcut_calendar button:hover,
-.st-key-able_shortcut_meeting button:hover,
-.st-key-able_shortcut_tasks button:hover {
-    transform:translateY(-2px);background:#3B316C !important;border-color:#C0A3FF !important;
-}
-/* Preserve the original five-part composer: attachment, text, calendar, mic, send. */
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
-    align-items:center !important;gap:.25rem !important;
-    border:1px solid #8564DB !important;border-radius:26px !important;
-    padding:.55rem .65rem !important;
-    background:linear-gradient(115deg,#202044,#26224B) !important;
-    box-shadow:0 10px 38px rgba(85,53,167,.22) !important;
-}
-.able-input-anchor {display:none !important;}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input {
-    background:#292849 !important;color:#F9F7FF !important;
-    border:1px solid #4B426F !important;border-radius:13px !important;
-    box-shadow:none !important;min-height:42px !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input::placeholder {color:#BDB7D9 !important;}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
-    background:transparent !important;color:#EEE7FF !important;
-    border:0 !important;box-shadow:none !important;min-height:42px !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover {background:#45376F !important;border-radius:12px !important;}
-.st-key-able_inline_send button {background:#7853DA !important;border-radius:13px !important;color:white !important;}
-.st-key-able_inline_send button:hover {background:#956EF5 !important;}
-/* Global dark inputs: contrast on all pages, without changing application behavior. */
-[data-testid="stAppViewContainer"] [data-testid="stTextArea"] textarea,
-[data-testid="stAppViewContainer"] [data-testid="stTextInput"] input {
-    background:#232443;color:#F8F6FF;border-color:#555078;
-}
-[data-testid="stAppViewContainer"] [data-testid="stTextArea"] textarea::placeholder {color:#B9B3D2;}
-[data-testid="stPopoverBody"] {background:#20203F !important;border:1px solid #65518F !important;}
-[data-testid="stPopoverBody"] button {color:#F4F0FF !important;}
-/* Original mini-calendar uses light day cells: keep text readable in dark mode. */
-[data-testid="stPopoverBody"] .cal-week {color:#25304B !important;}
-[data-testid="stPopoverBody"] .cal-day {background:#2A2C4D;border-color:#555176 !important;}
-[data-testid="stPopoverBody"] .cal-num {color:#F3F0FF !important;}
-[data-testid="stPopoverBody"] .cal-task {color:#8A4300 !important;}
-[data-testid="stPopoverBody"] .cal-meeting {color:#164B76 !important;}
-.able-dark-hero {padding-top:clamp(28px,8vh,100px) !important;padding-bottom:30px !important;}
-.able-hero-sub {color:#CBC6E8 !important;}
-@media (max-width:800px) {
- .able-dark-hero {padding-top:22px !important;}
- .able-brand {font-size:52px !important;}
- .st-key-able_shortcut_mail button,.st-key-able_shortcut_calendar button,
- .st-key-able_shortcut_meeting button,.st-key-able_shortcut_tasks button {min-height:68px !important;font-size:.88rem !important;}
- div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {padding:.3rem !important;gap:.05rem !important;}
-}
+:root{color-scheme:dark;--able-bg:#0b0e24;--able-surface:#1c2040;--able-border:#49466d;--able-text:#f6f3ff;--able-muted:#b7b5d0;--able-accent:#a98aff}
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{
+ background:radial-gradient(ellipse 62% 48% at 78% 18%,rgba(101,54,184,.17),transparent 78%),#0b0e24!important;color:var(--able-text)!important}
+[data-testid="stHeader"]{background:rgba(11,14,36,.94)!important}
+[data-testid="stMainBlockContainer"],.block-container{max-width:1150px!important;padding:2rem 2rem 5rem!important;box-sizing:border-box!important}
+[data-testid="stSidebar"]{background:#11152e!important;border-right:1px solid #302e4d!important;overflow-x:hidden!important}
+[data-testid="stSidebar"] [data-testid="stSidebarContent"]{padding-left:1rem!important;padding-right:1rem!important;box-sizing:border-box!important;overflow-x:hidden!important}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{min-width:0!important}
+[data-testid="stSidebar"] [role="radiogroup"]{gap:.2rem!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label{padding:.45rem .55rem!important;border-radius:11px!important;min-width:0!important;align-items:center!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label:has(input:checked){background:#392b72!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label [data-testid="stRadioIcon"]{display:none!important}
+[data-testid="stSidebar"] [role="radiogroup"]>label>div:first-child:has(input){width:0!important;min-width:0!important;margin:0!important;overflow:hidden!important}
+[data-testid="stSidebar"] *{color:var(--able-text)}
+[data-testid="stSidebar"] [data-testid="stExpander"]{background:#191d3c!important;border:1px solid #35365d!important}
+[data-testid="stAppViewContainer"] h1,[data-testid="stAppViewContainer"] h2,[data-testid="stAppViewContainer"] h3,[data-testid="stAppViewContainer"] p{color:var(--able-text)}
+[data-testid="stCaptionContainer"] p{color:var(--able-muted)!important}
+/* Uniform buttons, including secondary, navigation and OAuth link buttons */
+[data-testid="stAppViewContainer"] button,[data-testid="stSidebar"] button,
+[data-testid="stAppViewContainer"] a[data-testid="stLinkButton"]{
+ background:#262747!important;color:#f7f4ff!important;border:1px solid #5a527f!important;border-radius:11px!important;box-shadow:none!important}
+[data-testid="stAppViewContainer"] button *,[data-testid="stSidebar"] button *{color:inherit!important}
+[data-testid="stAppViewContainer"] button:hover,[data-testid="stSidebar"] button:hover{background:#3a3164!important;border-color:#a88aff!important}
+[data-testid="stAppViewContainer"] button[kind="primary"], [data-testid="stAppViewContainer"] button[data-testid="stBaseButton-primary"]{background:#7351ce!important;color:white!important;border-color:#8e70ea!important}
+[data-testid="stAppViewContainer"] input,[data-testid="stAppViewContainer"] textarea,
+[data-testid="stAppViewContainer"] [data-baseweb="select"]>div,
+[data-testid="stSidebar"] input{background:#232642!important;color:#faf8ff!important;border-color:#595579!important;caret-color:#fff!important}
+[data-testid="stAppViewContainer"] input::placeholder,[data-testid="stAppViewContainer"] textarea::placeholder{color:#bcb6d2!important;opacity:1!important}
+[data-testid="stFileUploader"]{background:#1b203d!important;border-radius:13px!important}
+[data-testid="stFileUploaderDropzone"]{background:#202541!important;border:1px dashed #71659d!important;border-radius:12px!important}
+[data-testid="stFileUploaderDropzone"] *{color:#eee9ff!important}
+[data-testid="stPopoverBody"]{background:#1c203d!important;border:1px solid #65588d!important;color:#f6f2ff!important;max-width:calc(100vw - 24px)!important;box-sizing:border-box!important}
+[data-testid="stPopoverBody"] [data-testid="stHorizontalBlock"]{min-width:0!important}
+/* Restore calendar readable colors, keep all seven columns within their container */
+.cal-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
+.cal-grid>*{min-width:0!important;box-sizing:border-box!important}
+.cal-week{background:#303357!important;color:#e9e4ff!important;border-radius:7px!important;text-align:center!important}
+.cal-day{background:#171b37!important;border:1px solid #4a486d!important;border-radius:9px!important;min-width:0!important;overflow:hidden!important}
+.cal-num{color:#f5f2ff!important}.cal-other{opacity:.45}.cal-today{outline:2px solid #a98aff!important;outline-offset:-2px}
+.cal-chip{overflow-wrap:anywhere!important;word-break:break-word!important}
+.cal-task{background:#4c352b!important;color:#ffddae!important}.cal-meeting{background:#213c58!important;color:#b8e4ff!important}
+.cal-more{color:#c3bce2!important}
+/* Homepage hero and shortcut cards */
+.able-dark-hero{text-align:center;padding:clamp(24px,6vh,72px) 8px 28px!important}
+.able-star{font-size:52px;color:#c18cff;text-shadow:0 0 28px #784bc2}
+.able-brand{font-size:clamp(46px,5vw,72px);letter-spacing:.13em;font-weight:800;color:white;line-height:1.15}
+.able-tagline{font-size:1.02rem;font-weight:650;color:#e7dbff}
+.able-hero-sub{margin-top:20px;line-height:1.75;color:#c7c2df}
+.st-key-able_shortcut_mail button,.st-key-able_shortcut_calendar button,.st-key-able_shortcut_meeting button,.st-key-able_shortcut_tasks button{
+ min-height:94px!important;width:100%!important;background:linear-gradient(135deg,#302d58,#232342)!important;
+ border:1px solid #68578e!important;border-radius:17px!important;color:#fff!important;font-weight:700!important;font-size:.98rem!important}
+.st-key-able_shortcut_mail button:hover,.st-key-able_shortcut_calendar button:hover,.st-key-able_shortcut_meeting button:hover,.st-key-able_shortcut_tasks button:hover{background:#41366f!important;transform:translateY(-1px)}
+/* Existing attachment / text / calendar / mic / send row; no widget replacement */
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor){align-items:center!important;gap:.28rem!important;padding:.5rem .6rem!important;
+ background:#222344!important;border:1px solid #8768ce!important;border-radius:23px!important;box-shadow:0 12px 30px rgba(73,43,139,.2)!important}
+.able-input-anchor{display:none!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor)>[data-testid="stColumn"]{min-width:0!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) [data-testid="stTextInput"] input{min-height:42px!important;border-radius:11px!important;background:#292a4c!important;border:1px solid #5a517d!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button{min-height:40px!important;min-width:34px!important;padding:.25rem!important;background:transparent!important;border:0!important;color:#eee3ff!important;font-size:1.05rem!important}
+[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover{background:#40366c!important}
+.st-key-able_inline_send button{background:#7450d2!important;color:#fff!important;border-radius:11px!important}
+[data-testid="stChatMessage"]{background:#1d2040;border:1px solid #36345e;border-radius:15px}
+@media(max-width:850px){[data-testid="stMainBlockContainer"],.block-container{padding:1rem .7rem 4rem!important}.able-dark-hero{padding:24px 4px 20px!important}
+ [data-testid="stHorizontalBlock"]:has(.able-input-anchor){gap:0!important;padding:.28rem!important}
+ .cal-day{padding:3px!important;min-height:64px!important}.cal-chip{font-size:9px!important;padding:2px!important}}
 </style>""",unsafe_allow_html=True)
 
 if selected_page == PAGES[0]:
@@ -1878,9 +1801,9 @@ if selected_page == PAGES[0]:
                     ).replace(day=1).isoformat()
                     st.rerun()
             st.markdown("""<style>
-            div[data-testid="stPopoverBody"] {min-width:360px;}
+            div[data-testid="stPopoverBody"] {width:min(520px,calc(100vw - 28px));max-width:calc(100vw - 28px);}
             .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
-            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#eef2f7;border-radius:5px}
+            .cal-week{text-align:center;font-size:11px;font-weight:700;padding:5px 0;background:#303357;color:#e9e4ff;border-radius:5px}
             .cal-day{min-height:42px;padding:4px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
             .cal-other{opacity:.3}.cal-today{outline:2px solid #4a86bd}
             .cal-num{font-size:11px;font-weight:700;margin-bottom:3px}
@@ -2327,8 +2250,8 @@ if selected_page == PAGES[3]:
             st.rerun()
     st.markdown("""<style>
     .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
-    .cal-week{background:#eaf0f6;color:#243449;text-align:center;font-weight:700;padding:9px;border-radius:7px}
-    .cal-day{min-height:102px;padding:8px;border:1px solid #d9e1ed;border-radius:10px;background:var(--background-color);overflow:hidden}
+    .cal-week{background:#303357;color:#e9e4ff;text-align:center;font-weight:700;padding:9px;border-radius:7px}
+    .cal-day{min-height:102px;padding:8px;border:1px solid #4a486d;border-radius:10px;background:#171b37;overflow:hidden}
     .cal-other{opacity:.38}.cal-today{outline:2px solid #2383c6}
     .cal-num{font-size:13px;font-weight:800;margin-bottom:7px}
     .cal-chip{padding:4px 6px;border-radius:5px;margin:4px 0;font-size:11px;line-height:1.4;word-break:break-word}
