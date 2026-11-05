@@ -1382,11 +1382,42 @@ st.markdown("""<style>
 .able-home h1{font-size:2.2rem;letter-spacing:-.06em;margin:0 0 10px;font-weight:750}
 .able-home p{color:#788596;font-size:1rem;margin:0}
 [data-testid="stSidebar"]{border-right:1px solid #e8edf2}
-[data-testid="stSidebar"] [data-testid="stExpander"]{border:1px solid #e3ebf5;border-radius:14px;background:#f8fbff}
-[data-testid="stSidebar"] [data-testid="stExpander"] summary{font-weight:650;color:#27466e}
+/* Sidebar expander is styled in the dedicated dark-theme override below. */
 [data-testid="stChatInput"]{max-width:790px;margin:auto}
 /* 월간 미니 달력이 7열로 보이도록 팝오버 넓이 확보 */
 [data-testid="stPopoverBody"]:has(.cal-grid){min-width:min(560px,90vw)}
+
+/* ABLE sidebar conversation-management contrast fix: scoped, no functional changes */
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+  background:#292e53!important;border:1px solid #65618c!important;
+  border-radius:14px!important;overflow:hidden!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] details,
+[data-testid="stSidebar"] [data-testid="stExpander"] details>summary,
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+  background:#30365d!important;color:#f8f5ff!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary *,
+[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
+  color:#f8f5ff!important;fill:currentColor!important;opacity:1!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
+  background:#424573!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stVerticalBlock"] {
+  background:#292e53!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] button {
+  background:#48416e!important;color:#fff!important;
+  border:1px solid #8f83c4!important;opacity:1!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] button:hover {
+  background:#5c4b8d!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] button * {color:#fff!important;}
+[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stCaptionContainer"] p {
+  color:#d6d2ec!important;
+}
 </style>""", unsafe_allow_html=True)
 
 
@@ -1804,7 +1835,7 @@ if selected_page == PAGES[0]:
                 help="첨부만으로 분석하지 않습니다. 채팅으로 분석을 요청하세요."
             )
             if home_file is not None:
-                st.success(f"첨부 완료: {home_file.name}")
+                st.caption(f"✅ 첨부 완료: {home_file.name}")
             elif st.session_state.document:
                 st.caption(f"최근 회의록: {st.session_state.doc_name or '이름 없음'}")
     with input_col:
@@ -2627,4 +2658,64 @@ a[data-testid="stLinkButton"]:hover, [data-testid="stLinkButton"] a:hover {backg
 
 /* Calendar's own month buttons */
 .stApp button[kind="secondary"],.stApp button[kind="tertiary"] {background:#2d2b51!important;color:#fff!important}
+</style>""",unsafe_allow_html=True)
+
+
+# ABLE UI v4: scoped file attachment popover contrast fix; no uploader behavior changes.
+st.markdown("""<style>
+/* Streamlit popovers are portal-rendered, so style only the one containing a file uploader. */
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) {
+  width:min(430px,calc(100vw - 24px))!important;
+  min-width:0!important;
+  max-width:calc(100vw - 24px)!important;
+  background:#292d4d!important;
+  border:1px solid #7771ae!important;
+  border-radius:16px!important;
+  padding:12px!important;
+  overflow-x:hidden!important;
+  box-shadow:0 16px 44px rgba(0,0,0,.30)!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) p,
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) label,
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) span,
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) small {
+  color:#f3f0ff!important;
+  opacity:1!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stFileUploaderDropzone"] {
+  background:#34395d!important;
+  border:1px dashed #9185c7!important;
+  border-radius:12px!important;
+  padding:10px!important;
+  min-height:64px!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stFileUploaderDropzone"] button {
+  background:#514484!important;
+  color:#fff!important;
+  border:1px solid #a798e1!important;
+}
+/* Uploaded filename row: avoid white-on-white and prevent filename overflow. */
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stFileUploaderFile"] {
+  background:#373a61!important;
+  color:#fff!important;
+  border:1px solid #66628f!important;
+  border-radius:10px!important;
+  min-width:0!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stFileUploaderFile"] * {
+  color:#f7f5ff!important;
+  opacity:1!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stFileUploaderFile"] button {
+  background:#49456e!important;
+  color:#fff!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stCaptionContainer"] p {
+  color:#a9f2c9!important;
+  font-size:.85rem!important;
+  overflow-wrap:anywhere!important;
+}
+[data-testid="stPopoverBody"]:has([data-testid="stFileUploader"]) [data-testid="stFileUploaderDropzoneInstructions"] {
+  min-width:0!important;
+}
 </style>""",unsafe_allow_html=True)
