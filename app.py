@@ -1625,13 +1625,90 @@ def tab_voice_title(title, tab_id):
                 st.write(st.session_state.last_answer)
 
 
+
+# ABLE dark-minimal visual theme (presentation only; existing functionality preserved)
+st.markdown("""<style>
+:root {color-scheme:dark;}
+[data-testid="stAppViewContainer"], [data-testid="stMain"], .stApp {
+  background: radial-gradient(ellipse 75% 52% at 72% 22%, rgba(102,45,194,.20), transparent 72%),
+              radial-gradient(ellipse 54% 42% at 14% 88%, rgba(46,68,178,.16), transparent 72%),
+              #090d23 !important;
+  color:#f4f1ff !important;
+}
+[data-testid="stHeader"] {background:rgba(9,13,35,.82) !important;}
+[data-testid="stSidebar"] {background:#0d1230 !important; border-right:1px solid rgba(168,145,255,.14) !important;}
+[data-testid="stSidebar"] * {color:#e6e3fb;}
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+  background:#171b3c !important; border:1px solid #34315e !important;
+}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+  background:linear-gradient(110deg,#4930a2,#34236e);border-radius:11px;
+}
+.block-container {max-width:1150px !important;padding-top:2.4rem !important;}
+.able-dark-hero {text-align:center;padding:clamp(18px,4vh,48px) 8px 20px;}
+.able-star {font-size:57px;line-height:1.2;color:#c58aff;text-shadow:0 0 36px rgba(159,92,255,.65);}
+.able-brand {font-size:clamp(45px,6vw,76px);font-weight:800;letter-spacing:.13em;color:#fff;line-height:1.2;}
+.able-tagline {color:#e1d8ff;font-size:1.08rem;font-weight:650;}
+.able-hero-sub {margin-top:19px;color:#b9b9d7;font-size:1rem;line-height:1.8;}
+/* Shortcuts: only the home row that directly follows the hero */
+div[data-testid="stVerticalBlock"]:has(> div .able-dark-hero) > div[data-testid="stHorizontalBlock"] button {
+  min-height:80px !important;border:1px solid rgba(179,139,255,.32) !important;
+  background:linear-gradient(140deg,rgba(115,83,203,.22),rgba(33,37,84,.70)) !important;
+  border-radius:18px !important;color:#f5f1ff !important;font-weight:650;
+  box-shadow:0 10px 30px rgba(0,0,0,.14);
+}
+div[data-testid="stVerticalBlock"]:has(> div .able-dark-hero) > div[data-testid="stHorizontalBlock"] button:hover {
+  border-color:#b08aff !important;background:#332762 !important;transform:translateY(-1px);
+}
+/* Existing combined input: preserve attachment, calendar, microphone and send controls */
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {
+  border:1px solid #7551c4 !important;border-radius:25px !important;
+  background:rgba(28,30,65,.96) !important;
+  box-shadow:0 0 24px rgba(133,77,243,.16) !important;
+  padding:.42rem .55rem !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) input {
+  background:transparent !important;color:#fff !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) input::placeholder {color:#aaa7c6 !important;}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button {
+  background:transparent !important;color:#e8d9ff !important;border:0 !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) button:hover {background:#40316b !important;}
+[data-testid="stChatMessage"] {background:rgba(28,30,62,.75);border:1px solid #302c59;border-radius:17px;padding:.7rem 1rem;}
+[data-testid="stPopoverBody"] {background:#1a1b39 !important;color:#f4f1ff !important;border:1px solid #51407c !important;}
+[data-testid="stPopoverBody"] * {color:inherit;}
+[data-testid="stAppViewContainer"] p,[data-testid="stAppViewContainer"] h1,[data-testid="stAppViewContainer"] h2,[data-testid="stAppViewContainer"] h3 {color:#f4f1ff;}
+[data-testid="stAppViewContainer"] [data-testid="stTextInput"] input,
+[data-testid="stAppViewContainer"] textarea {color:#f4f1ff;}
+@media(max-width:680px) {
+ .block-container{padding-top:1rem !important;}
+ .able-dark-hero{padding:16px 0 12px;}
+ .able-brand{font-size:44px;}
+ div[data-testid="stHorizontalBlock"]:has(.able-input-anchor) {gap:0 !important;padding:.2rem !important;}
+}
+</style>""",unsafe_allow_html=True)
+
 if selected_page == PAGES[0]:
     # 홈 화면
-    st.markdown("""<div class="able-home">
-      <div class="able-orb">✦</div>
-      <h1>무엇을 도와드릴까요?</h1>
-      <p>당신의 AI 개인비서, ABLE</p>
-    </div>""", unsafe_allow_html=True)
+    if not st.session_state.messages:
+        st.markdown("""<div class="able-dark-hero">
+          <div class="able-star">✦</div>
+          <div class="able-brand">ABLE</div>
+          <div class="able-tagline">나의 AI 개인비서</div>
+          <div class="able-hero-sub">이메일, 일정, 회의록, 업무 정리까지<br>지금, 에이블에게 말해보세요.</div>
+        </div>""", unsafe_allow_html=True)
+        shortcut_cols = st.columns(4, gap="small")
+        shortcuts = [
+            ("✉️ 이메일 작성", PAGES[4], "able_shortcut_mail"),
+            ("📅 일정 확인", PAGES[3], "able_shortcut_calendar"),
+            ("📄 회의록 요약", PAGES[1], "able_shortcut_meeting"),
+            ("✅ 업무 정리", PAGES[2], "able_shortcut_tasks"),
+        ]
+        for col, (label, destination, key) in zip(shortcut_cols, shortcuts):
+            with col:
+                st.button(label, key=key, use_container_width=True,
+                          on_click=navigate_to, args=(destination,))
     for message in st.session_state.messages[-10:]:
         with st.chat_message(message["role"]):
             st.write(message["content"])
