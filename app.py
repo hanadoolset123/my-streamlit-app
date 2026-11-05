@@ -2719,3 +2719,43 @@ st.markdown("""<style>
   min-width:0!important;
 }
 </style>""",unsafe_allow_html=True)
+
+
+# ABLE v6 — all-tab text contrast and Markdown list visibility (presentation only)
+st.markdown(r"""<style>
+/* Standard Markdown, including ordered/unordered lists and nested text. */
+.stApp [data-testid="stMarkdownContainer"] {color:#F3F2FF!important;}
+.stApp [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stMarkdownContainer"] li,
+.stApp [data-testid="stMarkdownContainer"] li p,
+.stApp [data-testid="stMarkdownContainer"] ol,
+.stApp [data-testid="stMarkdownContainer"] ul,
+.stApp [data-testid="stMarkdownContainer"] blockquote,
+.stApp [data-testid="stMarkdownContainer"] strong,
+.stApp [data-testid="stMarkdownContainer"] em {color:#F3F2FF!important;opacity:1!important;}
+.stApp [data-testid="stMarkdownContainer"] li::marker {color:#C6AEFF!important;}
+.stApp [data-testid="stMarkdownContainer"] h1,
+.stApp [data-testid="stMarkdownContainer"] h2,
+.stApp [data-testid="stMarkdownContainer"] h3,
+.stApp [data-testid="stMarkdownContainer"] h4 {color:#FFFFFF!important;opacity:1!important;}
+.stApp [data-testid="stMarkdownContainer"] a {color:#C9B7FF!important;text-decoration-color:#9F8CE2!important;}
+.stApp [data-testid="stMarkdownContainer"] code {background:#353454!important;color:#F5EFFF!important;}
+.stApp [data-testid="stMarkdownContainer"] blockquote {border-left:3px solid #9D85E0!important;background:#292A49!important;padding:.5rem .85rem!important;}
+.stApp [data-testid="stMarkdownContainer"] table {background:#262946!important;color:#F6F3FF!important;}
+.stApp [data-testid="stMarkdownContainer"] th {background:#39375D!important;color:#FFFFFF!important;}
+.stApp [data-testid="stMarkdownContainer"] td {color:#F4F0FF!important;border-color:#565477!important;}
+/* Preserve intended muted captions but keep them readable. */
+.stApp [data-testid="stCaptionContainer"] p {color:#D0CDE6!important;opacity:1!important;}
+.stApp [data-testid="stWidgetLabel"] p,
+.stApp [data-testid="stWidgetLabel"] span {color:#F6F3FF!important;opacity:1!important;}
+/* Expanders and tabs, including text in their panels. */
+.stApp [data-testid="stExpander"] summary,
+.stApp [data-testid="stExpander"] summary span,
+.stApp [data-testid="stTabs"] button,
+.stApp [data-testid="stTabs"] button p {color:#F5F1FF!important;opacity:1!important;}
+/* Notices: contrast against existing dark notice backgrounds. */
+.stApp [data-testid="stAlert"] p,
+.stApp [data-testid="stAlert"] li {color:#F5F2FF!important;opacity:1!important;}
+/* Avoid styling calendar event badges, which have their own category colors. */
+.cal-chip,.cal-chip * {opacity:1!important;}
+</style>""",unsafe_allow_html=True)
