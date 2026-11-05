@@ -863,7 +863,7 @@ def handle_home_request(question, user_name):
         st.session_state.last_answer = confirmation
         st.session_state.able_audio_answer_id = uuid.uuid4().hex
         # 홈에 머물러 결과를 확인할 수 있도록 한다. 다른 메뉴의 데이터는 session_state로 공유된다.
-        st.session_state.able_navigation = PAGES[0]
+        # 홈에서 실행 중이므로 라디오 위젯의 상태를 직접 변경하지 않습니다.
     else:
         with st.spinner("에이블이 답변을 준비하고 있어요..."):
             ask_ai(f"[현재 사용자: {user_name}]\n{question}", document, raw_question=question)
