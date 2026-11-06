@@ -1,81 +1,42 @@
 
-import time, base64, mimetypes
+import os
 import streamlit as st
-
+from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
-# 이미지 변환 함수
-@st.cache_resource
-def bytes_to_data_url(file_bytes: bytes, filename: str) -> str:
-    mime, _ = mimetypes.guess_type(filename)
-    if mime is None:
-        mime = "image/jpeg"
-    b64 = base64.b64encode(file_bytes).decode("utf-8")
-    return f"data:{mime};base64,{b64}"
+# JSON 구조
+class MovieRec(BaseModel):
+    title: str = Field(description="추천 영화 제목")
+    year: int | None = Field(default=None, description="개봉 연도")
+    reason: str = Field(description="추천 이유(2~3문장)")
+    tags: list[str] = Field(description="키워드 3개")
 
-# 체인 생성 캐싱
+# 체인 생성 캐싱 (앱 시작 시 딱 한 번만 실행됨)
 @st.cache_resource
-def get_chain():
-    s_msg = "당신은 이미지 내용을 정확히 묘사하고 요약하는 전문가입니다."
-    h_msg = [
-        {"type": "text", "text": "{question}"},
-        {"type": "image_url", "image_url": {"url": "{image_url}"}},
-    ]
+def create_movie_chain():
+    s_msg = "당신은 영화 전문가입니다. 사용자가 원하는 장르의 최신 영화를 추천합니다."
+    h_msg = "{genre} 장르의 최신 영화 1편을 추천하세요. JSON 스키마에 맞춰 답하세요."
     messages = [("system", s_msg), ("human", h_msg)]
     prompt = ChatPromptTemplate.from_messages(messages)
-    llm = ChatOpenAI(model="gpt-4o-mini")
-    return prompt | llm
+
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    return prompt | llm.with_structured_output(MovieRec)
 
 # Streamlit UI
-st.set_page_config(page_title="🖼️ 이미지 분석")
-st.title("🖼️ 이미지 업로드 분석기")
+st.set_page_config(page_title="🎬 AI Movie Rec", page_icon="🍿")
+st.title("🎬 영화 추천")
 
-# 사이드바 설정
-with st.sidebar:
-    st.header("설정")
-    user_prompt = st.text_area(
-        "분석 요청 사항",
-        value="이미지를 3문장으로 설명하고, 마지막에 한 줄 캡션을 써주세요.",
-        height=150
-    )
+genre = st.selectbox("장르 선택", ["공상과학", "액션", "드라마", "코미디", "스릴러", "공포", "로맨스"])
 
-# 이미지 업로드
-uploaded = st.file_uploader("이미지 선택", type=["jpg", "jpeg", "png"])
+if st.button("추천 받기", type="primary"):
+    with st.spinner(f"📡 {genre} 영화 정보를 가져오는 중..."):
+        chain = create_movie_chain()
+        response = chain.invoke({"genre": genre})
 
-if uploaded:
-    img_bytes = uploaded.read()
-    # 이미지 표시
-    st.image(img_bytes, caption="분석 대상 이미지", width=600)
+    st.subheader(f"🎥 추천: {response.title} ({response.year})")
+    st.info(response.reason)
+    st.write(f"🏷️ {' '.join([f'#{t}' for t in response.tags])}")
 
-    if st.button("이미지 분석 시작", type="primary"):
-        if not user_prompt.strip():
-            st.warning("요청 사항을 입력해주세요.")
-            st.stop()
-
-        # 이미지 경로
-        data_url = bytes_to_data_url(img_bytes, uploaded.name)
-
-        # 체인 구성
-        chain = get_chain()
-
-        # 체인 실행
-        with st.spinner(f"🔍이미지를 분석하는 중..."):
-            response = chain.invoke(
-                {
-                    "question": user_prompt.strip(),
-                    "image_url": data_url,
-                }
-            )
-
-        # 결과 출력
-        with st.chat_message("assistant"):
-            response_container = st.empty()
-            full_response = ""
-            for char in response.content:
-                full_response += char
-                response_container.markdown(full_response + "▌")
-                time.sleep(0.01)
-            response_container.markdown(full_response)
-else:
-    st.info("이미지를 업로드해 주세요.")
+    with st.expander("DEBUG: 원본 데이터"):
+        st.json(response.model_dump())
